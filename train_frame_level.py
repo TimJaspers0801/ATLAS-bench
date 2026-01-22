@@ -195,7 +195,8 @@ def train(args):
 
             images, masks = images.to(device), masks.to(device).squeeze()
 
-            if args.model == 'eomt':
+            if 'eomt' in args.model.lower():
+                print('training eomt model')
                 mask_logits_per_layer, class_logits_per_layer = model(images, return_semantic=False)
                 from loss.eomt_loss import convert_semantic_to_eomt_targets
                 seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=7)  # list of dicts
@@ -216,8 +217,8 @@ def train(args):
                     layer_loss = train_criterion.loss_total(losses_dict)  # scalar tensor
 
                     loss = layer_loss if seg_loss is None else seg_loss + layer_loss
-
             else:
+                print("training standard model")
                 outputs = model(images)
                 loss = criterion(outputs, masks)
 
