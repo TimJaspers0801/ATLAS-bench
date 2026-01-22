@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from datasets.atlas import AtlasDataset
 import torchvision.transforms.v2 as T
 from torch import nn
-from utils import load_checkpoint, color_palette
+from utils import load_checkpoint, bgr_palette
 import pandas as pd
 
 from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt_l_dinov2,\
@@ -17,7 +17,7 @@ from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt
 
 from models.eomt.eomt import get_param_groups_llrd
 from evaluation.dataset_evaluation import evaluate_model
-from evaluation.visual_logging import collect_visual_examples
+from evaluation.visual_logging import collect_visual_grid
 
 
 def train(args):
@@ -255,28 +255,25 @@ def train(args):
             "Epoch": epoch,
         })
 
-        # --- Qualitative logging ---
-        if epoch % 5 == 0:  # log visuals occasionally
-            visuals = collect_visual_examples(
+        # --- qualitative ---
+        if epoch % 5 == 0:
+            grid = collect_visual_grid(
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                color_palette=color_palette,
+                color_palette=bgr_palette,
+                mean=val_loader.dataset.mean,
+                std=val_loader.dataset.std,
                 max_samples=6,
             )
 
-            wandb.log({
-                "Validation examples": [
-                    wandb.Image(
-                        v["image"],
-                        masks={
-                            "ground_truth": {"mask_data": v["gt"]},
-                            "prediction": {"mask_data": v["pred"]},
-                        }
+            if grid is not None:
+                wandb.log({
+                    "Validation predictions": wandb.Image(
+                        grid,
+                        caption="Left: Image | Middle: GT | Right: Prediction"
                     )
-                    for v in visuals
-                ]
-            }, step=epoch)
+                }, step=epoch)
 
         current_score = metrics["Dice"]
 
