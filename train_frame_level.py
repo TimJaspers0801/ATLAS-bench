@@ -267,17 +267,13 @@ def train(args):
                 std=val_loader.dataset.std,
             )
 
-            print(len(grids))
-
+            visual_logs = {}
             for i, grid in enumerate(grids):
-                print(grid.shape)
-                print(np.sum(grid))
-                wandb.log({
-                    f"Val clip {i}": wandb.Image(
-                        grid,
-                        caption="Image | GT overlay | Prediction overlay"
-                    )
-                }, step=epoch)
+                visual_logs[f"Visuals/Val_clip_{i}"] = wandb.Image(
+                    grid,
+                    caption=f"Epoch {epoch} | Image | GT | Pred"
+                )
+            wandb.log(visual_logs, step=epoch)
 
         current_score = metrics["Dice"]
 
