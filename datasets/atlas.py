@@ -33,6 +33,7 @@ class AtlasDataset(Dataset):
             raise ValueError("frame_percentage must be between 1 and 100")
 
         self.zip_path = zip_path
+        self.zf = None
         self.split = split
         self.transform = transform
         self.allowed_videos = allowed_videos
@@ -151,6 +152,10 @@ class AtlasDataset(Dataset):
             return img.copy()
 
     def __getitem__(self, idx):
+        # Open the zip once per worker and keep it open
+        if self.zf is None:
+            self.zf = zipfile.ZipFile(self.zip_path, "r")
+
         if self.first_frame_only:
             sample = self.clip_to_samples[self.clip_ids[idx]][0]
         elif self.one_sample_per_clip:
@@ -158,9 +163,8 @@ class AtlasDataset(Dataset):
         else:
             sample = self.samples[idx]
 
-        with zipfile.ZipFile(self.zip_path, "r") as zf:
-            image = self._read_from_zip(zf, sample["img"]).convert("RGB")
-            mask = self._read_from_zip(zf, sample["mask"]).convert("L")
+        image = self._read_from_zip(self.zf, sample["img"]).convert("RGB")
+        mask = self._read_from_zip(self.zf, sample["mask"]).convert("L")
 
         # 1. Convert to TVTensors instead of using functional.to_mask
         # This automatically converts PIL -> Tensor and tags the type
@@ -171,6 +175,7 @@ class AtlasDataset(Dataset):
         if self.transform:
             image, mask = self.transform(image, mask)
 
+        print(type(image), type(mask))
         # 3. Convert to float and SCALE to [0, 1]
         # The 'scale=True' is the critical missing piece!
         image = T.functional.to_dtype(image, dtype=torch.float32, scale=True)
