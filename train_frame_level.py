@@ -25,6 +25,7 @@ def train(args):
     # set random seeds
     torch.manual_seed(42)
     torch.cuda.manual_seed(42)
+    is_eomt = False
 
     # Init wandb
     wandb.init(project="Atlas",
