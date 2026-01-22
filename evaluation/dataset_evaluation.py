@@ -5,7 +5,7 @@ import numpy as np
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eomt=False):
     model.eval()
 
     # Track scores per class across the entire dataset
@@ -23,7 +23,10 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
 
-            outputs = model(images)
+            if is_eomt:
+                outputs = model(images, return_semantic=True)
+            else:
+                outputs = model(images)
 
             # Determine Preds
             if outputs.shape[1] == 1:
