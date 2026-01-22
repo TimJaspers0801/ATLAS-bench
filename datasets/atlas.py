@@ -163,18 +163,21 @@ class AtlasDataset(Dataset):
             image = self._read_from_zip(zf, sample["img"]).convert("RGB")
             mask = self._read_from_zip(zf, sample["mask"]).convert("L")
 
-        # Convert mask to long tensor
-        mask = torch.from_numpy(np.array(mask)).long()
+        # 1. Convert PIL images to Tensors immediately
+        # Using T.functional is often cleaner inside __getitem__
+        image = T.functional.to_image(image)
+        mask = T.functional.to_mask(mask)
 
-        # Apply transforms first if provided
+        # 2. Apply transforms (v2 handles (Tensor, Tensor) pairs perfectly)
         if self.transform:
             image, mask = self.transform(image, mask)
 
-        # Convert image to float tensor in [0,1]
-        image = T.ToDtype(torch.float32, scale=True)(image)  # v2 equivalent of ToTensor
+        # 3. Convert to float and SCALE to [0, 1]
+        # The 'scale=True' is the critical missing piece!
+        image = T.functional.to_dtype(image, dtype=torch.float32, scale=True)
 
-        # Normalize
-        image = T.Normalize(mean=self.mean, std=self.std)(image)
+        # 4. Normalize (now that values are 0-1)
+        image = T.functional.normalize(image, mean=self.mean, std=self.std)
 
         return {
             "image": image,
