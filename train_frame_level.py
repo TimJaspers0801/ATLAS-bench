@@ -3,13 +3,12 @@ import wandb
 import torch
 import os
 from tqdm import tqdm
-from collections import defaultdict
 
 from torch.utils.data import DataLoader
 from datasets.atlas import AtlasDataset
 import torchvision.transforms.v2 as T
 from torch import nn
-from utils import load_checkpoint, visualize_predictions, compute_per_class_dice, class_names_surgenetseg75k
+from utils import load_checkpoint, color_palette
 import pandas as pd
 
 from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt_l_dinov2,\
@@ -18,6 +17,7 @@ from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt
 
 from models.eomt.eomt import get_param_groups_llrd
 from evaluation.dataset_evaluation import evaluate_model
+from evaluation.visual_logging import collect_visual_examples
 
 
 def train(args):
@@ -254,6 +254,29 @@ def train(args):
             "Val AP75": metrics["AP75"],
             "Epoch": epoch,
         })
+
+        # --- Qualitative logging ---
+        if epoch % 5 == 0:  # log visuals occasionally
+            visuals = collect_visual_examples(
+                model=model,
+                dataloader=val_loader,
+                device=device,
+                color_palette=color_palette,
+                max_samples=6,
+            )
+
+            wandb.log({
+                "Validation examples": [
+                    wandb.Image(
+                        v["image"],
+                        masks={
+                            "ground_truth": {"mask_data": v["gt"]},
+                            "prediction": {"mask_data": v["pred"]},
+                        }
+                    )
+                    for v in visuals
+                ]
+            }, step=epoch)
 
         current_score = metrics["Dice"]
 
