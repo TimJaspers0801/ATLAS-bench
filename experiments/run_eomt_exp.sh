@@ -46,10 +46,11 @@ cd ${PROJECT_ROOT} || exit 1
 DATA_ZIP=/data/atlas.zip
 OUTPUT_PATH=/outputs
 IMG_SIZE=336
-EPOCHS=5
+EPOCHS=10
 BATCH_SIZE=128
 NUM_CLASSES=46
 NUM_WORKERS=16
+FRAMES_PERCENTAGE=100
 
 # ===========================
 # Experiment — EoMT DINOv2

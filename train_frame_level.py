@@ -244,6 +244,7 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
+            num_classes=args.num_classes
         )
 
         wandb.log({
@@ -311,12 +312,14 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
+            num_classes=args.num_classes
         )
     print("Evaluating on Test set...")
     test_metrics = evaluate_model(
             model=model,
             dataloader=test_loader,
             device=device,
+            num_classes=args.num_classes
         )
     # Log final results
     wandb.log({
