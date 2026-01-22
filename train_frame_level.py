@@ -344,7 +344,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, help="Path to SurgeNet pre-trained weights")
-    parser.add_argument("--model", choices=["convnextv2", "metaformer", "pvtv2", "eomt"], required=True)
+    parser.add_argument("--model", type=str, required=True)
     parser.add_argument("--num_classes", type=int, default=46)
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=4)
