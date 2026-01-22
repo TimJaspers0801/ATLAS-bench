@@ -18,6 +18,7 @@ from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt
 from models.eomt.eomt import get_param_groups_llrd
 from evaluation.dataset_evaluation import evaluate_model
 from evaluation.visual_logging import collect_visual_grids
+import numpy as np
 
 
 def train(args):
@@ -269,6 +270,8 @@ def train(args):
             print(len(grids))
 
             for i, grid in enumerate(grids):
+                print(grid.shape)
+                print(np.sum(grid))
                 wandb.log({
                     f"Val clip {i}": wandb.Image(
                         grid,
