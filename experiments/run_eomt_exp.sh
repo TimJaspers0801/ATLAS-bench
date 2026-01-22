@@ -46,7 +46,7 @@ cd ${PROJECT_ROOT} || exit 1
 DATA_ZIP=/data/atlas.zip
 OUTPUT_PATH=/outputs
 IMG_SIZE=336
-EPOCHS=50
+EPOCHS=5
 BATCH_SIZE=128
 NUM_CLASSES=46
 NUM_WORKERS=16
@@ -66,7 +66,7 @@ srun apptainer exec --nv \
   --bind ${DATA_ROOT_HOST}:/data \
   --bind ${OUTPUT_ROOT_HOST}:/outputs \
   ${CONTAINER} \
-  python3 /workspace/train.py \
+  python3 /workspace/train_frame_level.py \
     --data_path ${DATA_ZIP} \
     --experiment_name ${EXPERIMENT_NAME} \
     --model eomt-s-dinov2 \
