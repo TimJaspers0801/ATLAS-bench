@@ -81,7 +81,6 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
     # 1. Just take the first few batches normally instead of searching
     # This is 100x faster than the 'next(enumerate...)' approach
     collected_frames = []
-    count = 0
     for batch in dataloader:
         images = batch["image"].to(device)
         masks = batch["mask"].to(device)
@@ -96,6 +95,10 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
 
             gt_m = masks[i].cpu().numpy()
             pr_m = preds[i].cpu().numpy()
+
+            print("image shape: ", img.shape)
+            print("gt shape and pr shape", gt_m.shape, pr_m.shape)
+            print(np.unique(gt_m), np.unique(pr_m))
 
             gt_ov = apply_mask_overlay(img_rgb, gt_m, palette)
             pr_ov = apply_mask_overlay(img_rgb, pr_m, palette)
