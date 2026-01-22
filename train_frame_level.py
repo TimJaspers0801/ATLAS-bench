@@ -17,7 +17,7 @@ from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt
 
 from models.eomt.eomt import get_param_groups_llrd
 from evaluation.dataset_evaluation import evaluate_model
-from evaluation.visual_logging import collect_visual_grid
+from evaluation.visual_logging import collect_visual_grids
 
 
 def train(args):
@@ -257,21 +257,20 @@ def train(args):
 
         # --- qualitative ---
         if epoch % 5 == 0:
-            grid = collect_visual_grid(
+            grids = collect_visual_grids(
                 model=model,
                 dataloader=val_loader,
                 device=device,
-                color_palette=bgr_palette,
+                palette=bgr_palette,
                 mean=val_loader.dataset.mean,
                 std=val_loader.dataset.std,
-                max_samples=6,
             )
 
-            if grid is not None:
+            for i, grid in enumerate(grids):
                 wandb.log({
-                    "Validation predictions": wandb.Image(
+                    f"Val clip {i}": wandb.Image(
                         grid,
-                        caption="Left: Image | Middle: GT | Right: Prediction"
+                        caption="Image | GT overlay | Prediction overlay"
                     )
                 }, step=epoch)
 

@@ -1,6 +1,8 @@
 import numpy as np
 import torch
 import cv2
+from collections import defaultdict
+
 
 
 def decode_mask(mask, color_palette):
@@ -71,41 +73,80 @@ def apply_mask_overlay(image, mask, palette, ignore_index=255):
 
 
 @torch.no_grad()
-def collect_visual_grid(
+def collect_visual_grids(
     model,
     dataloader,
     device,
     palette,
     mean,
     std,
-    max_samples=6,
+    n_clips=3,
+    frames_per_clip=4,
 ):
+    """
+    Returns:
+        grids: list[np.ndarray]  # length = n_clips
+               each grid shape: (frames_per_clip*H, 3*W, 3)
+    """
     model.eval()
-    rows = []
 
-    for batch in dataloader:
-        images = batch["image"].to(device)
-        masks = batch["mask"].to(device)
+    # 1) Collect frame indices per clip
+    clip_to_indices = defaultdict(list)
 
-        logits = model(images)
-        preds = torch.argmax(logits, dim=1)
+    for batch_idx, batch in enumerate(dataloader):
+        B = batch["image"].size(0)
+        for i in range(B):
+            clip_id = (
+                batch["procedure"][i],
+                batch["video"][i],
+                batch["clip"][i],
+            )
+            clip_to_indices[clip_id].append((batch_idx, i))
 
-        for i in range(images.size(0)):
-            if len(rows) >= max_samples:
-                break
+    if len(clip_to_indices) == 0:
+        return []
+
+    # 2) Pick clips (deterministic but uniform)
+    clip_ids = list(clip_to_indices.keys())
+    selected_clips = clip_ids[:n_clips]
+
+    grids = []
+
+    # 3) For each clip, sample frames uniformly
+    for clip_id in selected_clips:
+        indices = clip_to_indices[clip_id]
+
+        if len(indices) <= frames_per_clip:
+            sampled = indices
+        else:
+            sample_ids = np.linspace(
+                0, len(indices) - 1,
+                frames_per_clip,
+                dtype=int
+            )
+            sampled = [indices[i] for i in sample_ids]
+
+        rows = []
+
+        for batch_idx, i in sampled:
+            batch = next(
+                b for j, b in enumerate(dataloader)
+                if j == batch_idx
+            )
+
+            images = batch["image"].to(device)
+            masks = batch["mask"].to(device)
+
+            logits = model(images)
+            preds = torch.argmax(logits, dim=1)
 
             img = denormalize(images[i].cpu(), mean, std)
 
             gt_mask = masks[i].cpu().numpy()
             pr_mask = preds[i].cpu().numpy()
 
-            gt_overlay = apply_mask_overlay(
-                img, gt_mask, palette
-            )
-
-            pr_overlay = apply_mask_overlay(
-                img, pr_mask, palette
-            )
+            gt_overlay = apply_mask_overlay(img, gt_mask, palette)
+            pr_overlay = apply_mask_overlay(img, pr_mask, palette)
 
             row = np.concatenate(
                 [img, gt_overlay, pr_overlay],
@@ -113,10 +154,6 @@ def collect_visual_grid(
             )
             rows.append(row)
 
-        if len(rows) >= max_samples:
-            break
+        grids.append(np.concatenate(rows, axis=0))
 
-    if not rows:
-        return None
-
-    return np.concatenate(rows, axis=0)
+    return grids
