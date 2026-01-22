@@ -13,6 +13,7 @@ class AtlasDataset(Dataset):
     """
     Zip-based dataset with explicit train/val/test split,
     clip-aware sampling, and rich metadata outputs.
+    Auto-detects top-level folder if root_in_zip is not provided.
     """
 
     def __init__(
@@ -39,16 +40,25 @@ class AtlasDataset(Dataset):
         self.one_sample_per_clip = one_sample_per_clip
         self.first_frame_only = first_frame_only
         self.frame_percentage = frame_percentage
-
         self._rng = random.Random(seed)
 
-        # Normalize root prefix
+        # --------------------------------------------------
+        # Auto-detect root folder if not provided
+        # --------------------------------------------------
+        with zipfile.ZipFile(self.zip_path, "r") as zf:
+            all_files = [p.lstrip("./") for p in zf.namelist() if not p.endswith("/")]
+            top_level = {p.split("/")[0] for p in all_files if p.count("/") > 0}
+
         if root_in_zip:
             self.root_prefix = root_in_zip.strip("/\\") + "/"
         else:
-            self.root_prefix = ""
+            # Use single top-level folder if exactly one exists
+            if len(top_level) == 1:
+                self.root_prefix = list(top_level)[0] + "/"
+            else:
+                self.root_prefix = ""
 
-        # Prefix INCLUDING split
+        # Prefix including split
         self.split_prefix = f"{self.root_prefix}{split}/"
 
         # Storage
@@ -61,13 +71,9 @@ class AtlasDataset(Dataset):
         self.std = [0.24689102, 0.21034359, 0.21188641]
 
         # --------------------------------------------------
-        # Scan zip once
+        # Scan zip and build mapping
         # --------------------------------------------------
-        with zipfile.ZipFile(self.zip_path, "r") as zf:
-            all_files = [p.lstrip("./") for p in zf.namelist() if not p.endswith("/")]
-
         all_files_set = set(all_files)
-
         for file in all_files:
             if not file.startswith(self.split_prefix):
                 continue
@@ -79,7 +85,6 @@ class AtlasDataset(Dataset):
             rel = file[len(self.split_prefix):]
             parts = rel.split("/")
 
-            # procedure/video/clip/images/frame.jpg
             if len(parts) < 5:
                 continue
 
@@ -124,7 +129,6 @@ class AtlasDataset(Dataset):
                     samples = self._rng.sample(samples, n)
                 self.samples.extend(samples)
 
-        # Summary
         videos = {cid.rsplit("/", 1)[0] for cid in self.clip_ids}
 
         print(f"[AtlasDataset]")
@@ -135,6 +139,7 @@ class AtlasDataset(Dataset):
               "first frame" if first_frame_only else
               "one per clip" if one_sample_per_clip else
               f"{frame_percentage}% frames")
+
 
     def __len__(self):
         if self.first_frame_only or self.one_sample_per_clip:
