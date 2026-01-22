@@ -190,6 +190,7 @@ def train(args):
             masks = batch["mask"].to(device)
 
             images, masks = images.to(device), masks.to(device).squeeze()
+            print(masks.shape, masks.min(), masks.max())
 
             if 'eomt' in args.model.lower():
                 mask_logits_per_layer, class_logits_per_layer = model(images, return_semantic=False)
