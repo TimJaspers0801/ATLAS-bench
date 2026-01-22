@@ -194,7 +194,7 @@ def train(args):
             if 'eomt' in args.model.lower():
                 mask_logits_per_layer, class_logits_per_layer = model(images, return_semantic=False)
                 from loss.eomt_loss import convert_semantic_to_eomt_targets
-                seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=7)  # list of dicts
+                seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=args.num_classes)
 
                 # accumulate scalar losses across layers
                 seg_loss = None
