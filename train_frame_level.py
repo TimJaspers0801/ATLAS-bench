@@ -185,7 +185,6 @@ def train(args):
         best_epoch = None
 
     for epoch in range(args.epochs):
-        print("start training")
         model.train()
         train_loss = 0
 
@@ -193,12 +192,10 @@ def train(args):
         for step, batch in enumerate(pbar):
             images = batch["image"].to(device)
             masks = batch["mask"].to(device)
-            print(images.shape, masks.shape)
 
             images, masks = images.to(device), masks.to(device).squeeze()
 
             if 'eomt' in args.model.lower():
-                print('training eomt model')
                 mask_logits_per_layer, class_logits_per_layer = model(images, return_semantic=False)
                 from loss.eomt_loss import convert_semantic_to_eomt_targets
                 seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=7)  # list of dicts
