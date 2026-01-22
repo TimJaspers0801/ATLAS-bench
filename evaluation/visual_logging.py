@@ -102,8 +102,8 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
             pr_ov = apply_mask_overlay(img, pr_m, palette)
 
             # Optional: Resize here to make upload faster
-            row = np.concatenate([img, gt_ov, pr_ov], axis=1)
-            row = cv2.resize(row, (0,0), fx=0.5, fy=0.5)
+            # row = np.concatenate([img, gt_ov, pr_ov], axis=1)
+            # row = cv2.resize(row, (0,0), fx=0.5, fy=0.5)
 
             collected_frames.append(np.concatenate([img, gt_ov, pr_ov], axis=1))
 
