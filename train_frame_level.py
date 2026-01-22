@@ -215,7 +215,7 @@ def train(args):
                     loss = layer_loss if seg_loss is None else seg_loss + layer_loss
             else:
                 outputs = model(images)
-                loss = criterion(outputs, masks)
+                loss = criterion(outputs, masks.long())
 
             optimizer.zero_grad()
             loss.backward()
