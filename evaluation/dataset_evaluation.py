@@ -46,7 +46,7 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
                     ap_evaluator = SegmentationAPEvaluator()
 
                 pred_np = preds[i, 0].cpu().numpy()
-                gt_np = gt_masks[i].cpu().numpy()
+                gt_np = gt_masks[i].cpu().numpy().squeeze()
 
                 # --- Metric Collection (The part you wanted) ---
                 for c in classes_to_eval:
