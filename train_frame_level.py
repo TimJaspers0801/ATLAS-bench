@@ -258,7 +258,14 @@ def train(args):
         # --- qualitative ---
         if epoch % 1 == 0 or epoch == 0:
             print("Collecting visual grids for wandb...")
-            grids = collect_visual_grids(...)
+            grids = collect_visual_grids(
+                model=model,
+                dataloader=val_loader,
+                device=device,
+                palette=bgr_palette,
+                mean=val_loader.dataset.mean,
+                std=val_loader.dataset.std,
+            )
 
             # Create a list of wandb.Image objects
             wandb_images = [
