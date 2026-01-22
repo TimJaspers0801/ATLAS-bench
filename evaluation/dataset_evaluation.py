@@ -83,6 +83,8 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
 
     # AP Metrics
     AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
+    AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
+    AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
 
     # --- Print Detailed Report ---
     print("\n" + "=" * 40)
@@ -99,6 +101,8 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
         "mIoU": mIoU,
         "Dice": mDice,
         "AP": AP_total,
+        "AP50": AP_50,
+        "AP75": AP_75,
         "per_class_iou": final_per_class_iou,
         "per_class_dice": final_per_class_dice
     }
