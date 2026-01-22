@@ -366,13 +366,6 @@ class EoMT(nn.Module):
 
 
 
-
-
-
-
-
-
-
 ### helper functions for model training
 
 def get_vit_layer_id(param_name: str, num_backbone_blocks: int, num_prefix_tokens: int = 0):
@@ -469,6 +462,7 @@ def get_param_groups_llrd(model: torch.nn.Module, base_lr: float, weight_decay: 
 def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 5):
     from models.load_models import load_dinov2_s
     encoder = load_dinov2_s()
+    print(encoder.keys())
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
