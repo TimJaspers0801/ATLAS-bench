@@ -136,7 +136,7 @@ def train(args):
     model.to(device)
 
 
-    if args.model == 'eomt':
+    if 'eomt' in args.model.lower():
         from loss.eomt_loss import EoMTLoss
         train_criterion = EoMTLoss(num_points=12544,
                             oversample_ratio=3.0,
@@ -154,7 +154,7 @@ def train(args):
     criterion = nn.CrossEntropyLoss(ignore_index=255)
 
 
-    if args.model == 'eomt':
+    if 'eomt' in args.model.lower():
         optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
     else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
