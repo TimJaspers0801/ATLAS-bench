@@ -171,7 +171,7 @@ class AtlasDataset(Dataset):
             image, mask = self.transform(image, mask)
 
         # Convert image to float tensor in [0,1]
-        image = T.ToTensor()(image)
+        image = T.ToImage()(image)  # v2 equivalent of ToTensor
 
         # Normalize
         image = T.Normalize(mean=self.mean, std=self.std)(image)
