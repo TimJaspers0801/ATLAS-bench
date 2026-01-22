@@ -29,7 +29,7 @@ bgr_palette = {k: (v[2], v[1], v[0]) for k, v in color_palette.items()}
 
 def load_checkpoint(model, checkpoint_path):
     print(f"Loading checkpoint from {checkpoint_path}")
-    checkpoint = torch.load(checkpoint_path, map_location="cpu")
+    checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
     msg = model.load_state_dict(checkpoint["model"], strict=False)  # Adjust keys if needed
     print(msg)
 
