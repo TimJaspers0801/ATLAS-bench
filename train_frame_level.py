@@ -256,7 +256,7 @@ def train(args):
         })
 
         # --- qualitative ---
-        if epoch % 5 == 0 or epoch == 0:
+        if epoch % 1 == 0 or epoch == 0:
             print("Collecting visual grids for wandb...")
             grids = collect_visual_grids(
                 model=model,
