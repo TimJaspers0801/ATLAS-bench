@@ -139,8 +139,12 @@ def collect_visual_grids(
             masks = batch["mask"].to(device)
 
             logits = model(images)
+            print("logits: ", logits.shape)
             probs = torch.softmax(logits, dim=1)
+            print("probs: ", probs.shape)
             preds = torch.argmax(probs, dim=1)
+            print("preds: ", preds.shape)
+            print(preds.min(), preds.max())
 
             img = denormalize(images[i].cpu(), mean, std)
 
