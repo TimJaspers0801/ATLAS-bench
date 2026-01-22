@@ -37,12 +37,12 @@ def train(args):
 
     # Define transforms
     train_transform = T.Compose([
-        T.Resize(args.img_size, interpolation=T.InterpolationMode.NEAREST),
+        T.Resize(args.img_size, interpolation=T.InterpolationMode.BICUBIC),
         T.CenterCrop(args.img_size),
     ])
 
     val_transform = T.Compose([
-        T.Resize(args.img_size, interpolation=T.InterpolationMode.NEAREST),
+        T.Resize(args.img_size, interpolation=T.InterpolationMode.BICUBIC),
         T.CenterCrop(args.img_size),
     ])
 
