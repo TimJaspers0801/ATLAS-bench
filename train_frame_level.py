@@ -102,6 +102,7 @@ def train(args):
         base_lr = 1e-4
         weight_decay = 0.05
         llrd_factor = 0.8
+        is_eomt = True
 
     if args.model == 'eomt-s-dinov2':
         model = load_eomt_s_dinov2(n_classes=args.num_classes, num_q=args.num_classes)
@@ -234,7 +235,6 @@ def train(args):
         wandb.log({"Avg Train Loss": avg_train_loss, "Epoch": epoch})
         print(f"[Epoch {epoch}] Avg Train Loss: {avg_train_loss:.4f}")
 
-        is_eomt = 'eomt' in args.model.lower()
 
         # --- Validation ---
         metrics = evaluate_model(
