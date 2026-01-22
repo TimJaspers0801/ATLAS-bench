@@ -61,6 +61,17 @@ def load_dinov1_b():
 ###################################
 ### Loading dinov2 (using timm) ###
 ###################################
+
+def remap_dinov2_weights(state_dict):
+    # --- Remap keys: add 'backbone.' to ViT layers ---
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        if k.startswith("blocks") or k.startswith("patch_embed") or k.startswith("cls_token") or k.startswith("pos_embed") or k.startswith("norm"):
+            new_state_dict["backbone." + k] = v
+        else:
+            # keep the rest (dino_head, etc.) as-is
+            new_state_dict[k] = v
+    return new_state_dict
 def load_dinov2_s():
     # ViT-s
     model = vit.ViT(
@@ -70,6 +81,7 @@ def load_dinov2_s():
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vits'])
+    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-s weights with msg:\n", msg)
     return model
@@ -83,6 +95,7 @@ def load_dinov2_b():
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitb'])
+    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-b weights with msg:\n", msg)
     return model
@@ -96,6 +109,7 @@ def load_dinov2_l():
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitl'])
+    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-l weights with msg:\n", msg)
     return model
