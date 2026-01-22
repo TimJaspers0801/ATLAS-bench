@@ -234,12 +234,15 @@ def train(args):
         wandb.log({"Avg Train Loss": avg_train_loss, "Epoch": epoch})
         print(f"[Epoch {epoch}] Avg Train Loss: {avg_train_loss:.4f}")
 
+        is_eomt = 'eomt' in args.model.lower()
+
         # --- Validation ---
         metrics = evaluate_model(
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes
+            num_classes=args.num_classes,
+            is_eomt=is_eomt
         )
 
         wandb.log({
@@ -307,15 +310,17 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes
-        )
+            num_classes=args.num_classes,
+            is_eomt=is_eomt
+    )
     print("Evaluating on Test set...")
     test_metrics = evaluate_model(
             model=model,
             dataloader=test_loader,
             device=device,
-            num_classes=args.num_classes
-        )
+            num_classes=args.num_classes,
+            is_eomt=is_eomt
+    )
     # Log final results
     wandb.log({
         "Final Val mIoU": val_metrics["mIoU"],
