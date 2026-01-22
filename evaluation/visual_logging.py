@@ -41,6 +41,9 @@ def apply_mask_overlay(image, mask, palette, ignore_index=255):
 
     color_mask = np.zeros_like(image)
 
+    print(mask.shape, image.shape)
+    print(mask.min(), mask.max())
+
     for class_id, color in palette.items():
         color_mask[mask == class_id] = color
 
