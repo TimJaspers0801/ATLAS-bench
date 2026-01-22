@@ -3,31 +3,25 @@ from pycocotools import mask as mask_utils
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
-def compute_iou(pred, gt):
-    pred = pred.astype(bool)
-    gt = gt.astype(bool)
+def compute_class_metrics(pred, gt, class_id):
+    """
+    Computes IoU and Dice for a specific class ID in one image.
+    Returns (iou, dice) or (None, None) if class not present in GT.
+    """
+    p = (pred == class_id)
+    g = (gt == class_id)
 
-    intersection = np.logical_and(pred, gt).sum()
-    union = np.logical_or(pred, gt).sum()
+    if not np.any(g):
+        return None, None
 
-    if union == 0:
-        return 1.0 if intersection == 0 else 0.0
+    intersection = np.logical_and(p, g).sum()
+    union = np.logical_or(p, g).sum()
+    sum_pixels = p.sum() + g.sum()
 
-    return intersection / union
+    iou = intersection / union if union > 0 else 1.0
+    dice = (2. * intersection) / sum_pixels if sum_pixels > 0 else 1.0
 
-
-def compute_dice(pred, gt):
-    pred = pred.astype(bool)
-    gt = gt.astype(bool)
-
-    intersection = np.logical_and(pred, gt).sum()
-    total = pred.sum() + gt.sum()
-
-    if total == 0:
-        return 1.0
-
-    return 2 * intersection / total
-
+    return iou, dice
 def mask_to_rle(binary_mask):
     """
     binary_mask: HxW numpy array (0,1)

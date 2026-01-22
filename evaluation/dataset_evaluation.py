@@ -2,84 +2,103 @@ import torch
 from collections import defaultdict
 from tqdm import tqdm
 import numpy as np
-from .metrics import compute_iou, compute_dice, SegmentationAPEvaluator
+from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, threshold=0.5):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
     model.eval()
 
-    clip_iou = defaultdict(list)
-    clip_dice = defaultdict(list)
-    clip_ap = {}
+    # Track scores per class across the entire dataset
+    # format: {class_id: [score_img1, score_img2, ...]}
+    class_ious = defaultdict(list)
+    class_dices = defaultdict(list)
 
+    # We still keep the AP logic as it was
+    clip_ap = {}
     current_clip = None
     ap_evaluator = None
 
     with torch.no_grad():
-        for batch in tqdm(dataloader):
+        for batch in tqdm(dataloader, desc="Evaluating"):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
 
-            # model outputs: [B, 1, H, W] or [B, C, H, W]
             outputs = model(images)
 
+            # Determine Preds
             if outputs.shape[1] == 1:
-                probs = torch.sigmoid(outputs)
-                preds = (probs > threshold).long()
-                scores = probs.mean(dim=(2,3))  # global confidence
+                preds = (torch.sigmoid(outputs) > threshold).long()
+                scores = torch.sigmoid(outputs).mean(dim=(2, 3))
+                classes_to_eval = [1]
             else:
                 probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1, keepdim=True)
-                scores = probs.max(dim=1)[0].mean(dim=(1,2))
+                scores = probs.max(dim=1)[0].mean(dim=(1, 2))
+                classes_to_eval = range(1, num_classes)  # Skip background 0
 
             for i in range(len(images)):
+                # --- AP Handling ---
                 clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
-
-                # New clip → finalize previous AP
                 if current_clip != clip_id:
                     if ap_evaluator is not None:
                         clip_ap[current_clip] = ap_evaluator.evaluate()
-
                     current_clip = clip_id
                     ap_evaluator = SegmentationAPEvaluator()
 
-                pred = preds[i,0].cpu().numpy()
-                gt = gt_masks[i,0].cpu().numpy() if gt_masks.shape[1] == 1 else gt_masks[i].sum(0).cpu().numpy() > 0
+                pred_np = preds[i, 0].cpu().numpy()
+                gt_np = gt_masks[i].cpu().numpy()
 
-                pred = (pred > 0).astype(np.uint8)
-                gt = (gt > 0).astype(np.uint8)
+                # --- Metric Collection (The part you wanted) ---
+                for c in classes_to_eval:
+                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
 
-                iou = compute_iou(pred, gt)
-                dice = compute_dice(pred, gt)
+                    if iou_c is not None:
+                        class_ious[c].append(iou_c)
+                        class_dices[c].append(dice_c)
 
-                clip_iou[clip_id].append(iou)
-                clip_dice[clip_id].append(dice)
+                # Binary AP logic
+                gt_binary = (gt_np > 0).astype(np.uint8)
+                pred_binary = (pred_np > 0).astype(np.uint8)
+                ap_evaluator.add_frame(gt_binary, pred_binary, scores[i].item())
 
-                ap_evaluator.add_frame(gt, pred, scores[i].item())
-
-        # last clip
         if ap_evaluator is not None:
             clip_ap[current_clip] = ap_evaluator.evaluate()
 
-    # Aggregate per clip
-    clip_iou_mean = [np.mean(v) for v in clip_iou.values()]
-    clip_dice_mean = [np.mean(v) for v in clip_dice.values()]
+    # --- FINAL DATASET AGGREGATION ---
 
-    AP = [v["AP"] for v in clip_ap.values()]
-    AP50 = [v["AP50"] for v in clip_ap.values()]
-    AP75 = [v["AP75"] for v in clip_ap.values()]
+    final_per_class_iou = {}
+    final_per_class_dice = {}
 
-    print("\n===== Final Evaluation =====")
-    print(f"mIoU (clip):   {np.mean(clip_iou_mean):.4f}")
-    print(f"Dice (clip):   {np.mean(clip_dice_mean):.4f}")
-    print(f"AP:            {np.mean(AP):.4f}")
-    print(f"AP50:          {np.mean(AP50):.4f}")
-    print(f"AP75:          {np.mean(AP75):.4f}")
+    for c in classes_to_eval:
+        if len(class_ious[c]) > 0:
+            final_per_class_iou[c] = np.mean(class_ious[c])
+            final_per_class_dice[c] = np.mean(class_dices[c])
+        else:
+            final_per_class_iou[c] = 0.0
+            final_per_class_dice[c] = 0.0
+
+    # The Final Mean Scores
+    mIoU = np.mean(list(final_per_class_iou.values()))
+    mDice = np.mean(list(final_per_class_dice.values()))
+
+    # AP Metrics
+    AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
+
+    # --- Print Detailed Report ---
+    print("\n" + "=" * 40)
+    print(f"{'Class ID':<10} | {'IoU':<10} | {'Dice':<10}")
+    print("-" * 40)
+    for c in classes_to_eval:
+        print(f"Class {c:<4} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
+    print("-" * 40)
+    print(f"{'OVERALL':<10} | {mIoU:.4f}     | {mDice:.4f}")
+    print(f"{'mAP':<10} | {AP_total:.4f}")
+    print("=" * 40 + "\n")
 
     return {
-        "mIoU": np.mean(clip_iou_mean),
-        "Dice": np.mean(clip_dice_mean),
-        "AP": np.mean(AP),
-        "AP50": np.mean(AP50),
-        "AP75": np.mean(AP75),
+        "mIoU": mIoU,
+        "Dice": mDice,
+        "AP": AP_total,
+        "per_class_iou": final_per_class_iou,
+        "per_class_dice": final_per_class_dice
     }

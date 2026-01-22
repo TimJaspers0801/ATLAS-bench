@@ -90,7 +90,6 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
         for i in range(images.shape[0]):
             img = denormalize(images[i].cpu(), mean, std)
             # IMPORTANT: OpenCV is BGR, WandB is RGB. Convert here!
-            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
             gt_m = masks[i].cpu().numpy().squeeze()
             pr_m = preds[i].cpu().numpy()
@@ -99,14 +98,14 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
             print("gt shape and pr shape", gt_m.shape, pr_m.shape)
             print(np.unique(gt_m), np.unique(pr_m))
 
-            gt_ov = apply_mask_overlay(img_rgb, gt_m, palette)
-            pr_ov = apply_mask_overlay(img_rgb, pr_m, palette)
+            gt_ov = apply_mask_overlay(img, gt_m, palette)
+            pr_ov = apply_mask_overlay(img, pr_m, palette)
 
             # Optional: Resize here to make upload faster
-            # row = np.concatenate([img_rgb, gt_ov, pr_ov], axis=1)
-            # row = cv2.resize(row, (0,0), fx=0.5, fy=0.5)
+            row = np.concatenate([img, gt_ov, pr_ov], axis=1)
+            row = cv2.resize(row, (0,0), fx=0.5, fy=0.5)
 
-            collected_frames.append(np.concatenate([img_rgb, gt_ov, pr_ov], axis=1))
+            collected_frames.append(np.concatenate([img, gt_ov, pr_ov], axis=1))
 
             if len(collected_frames) >= (n_clips * frames_per_clip):
                 break
