@@ -258,22 +258,17 @@ def train(args):
         # --- qualitative ---
         if epoch % 1 == 0 or epoch == 0:
             print("Collecting visual grids for wandb...")
-            grids = collect_visual_grids(
-                model=model,
-                dataloader=val_loader,
-                device=device,
-                palette=bgr_palette,
-                mean=val_loader.dataset.mean,
-                std=val_loader.dataset.std,
-            )
+            grids = collect_visual_grids(...)
 
-            visual_logs = {}
-            for i, grid in enumerate(grids):
-                visual_logs[f"Visuals/Val_clip_{i}"] = wandb.Image(
-                    grid,
-                    caption=f"Epoch {epoch} | Image | GT | Pred"
-                )
-            wandb.log(visual_logs, step=epoch)
+            # Create a list of wandb.Image objects
+            wandb_images = [
+                wandb.Image(grid, caption=f"Clip {i} (Img | GT | Pred)")
+                for i, grid in enumerate(grids)
+            ]
+
+            # Log ALL images at once under one key
+            # This creates a nice slider in the WandB UI
+            wandb.log({"Visualizations/Val_Samples": wandb_images}, step=epoch)
 
         current_score = metrics["Dice"]
 

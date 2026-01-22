@@ -74,92 +74,46 @@ def apply_mask_overlay(image, mask, palette, ignore_index=255):
 
 
 @torch.no_grad()
-def collect_visual_grids(
-    model,
-    dataloader,
-    device,
-    palette,
-    mean,
-    std,
-    n_clips=3,
-    frames_per_clip=4,
-):
-    """
-    Returns:
-        grids: list[np.ndarray]  # length = n_clips
-               each grid shape: (frames_per_clip*H, 3*W, 3)
-    """
+def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=3, frames_per_clip=4):
     model.eval()
-
-    # 1) Collect frame indices per clip
-    clip_to_indices = defaultdict(list)
-
-    for batch_idx, batch in enumerate(dataloader):
-        B = batch["image"].size(0)
-        for i in range(B):
-            clip_id = (
-                batch["procedure"][i],
-                batch["video"][i],
-                batch["clip"][i],
-            )
-            clip_to_indices[clip_id].append((batch_idx, i))
-
-    if len(clip_to_indices) == 0:
-        return []
-
-    # 2) Pick clips (deterministic but uniform)
-    clip_ids = list(clip_to_indices.keys())
-    selected_clips = clip_ids[:n_clips]
-
     grids = []
 
-    # 3) For each clip, sample frames uniformly
-    for clip_id in selected_clips:
-        indices = clip_to_indices[clip_id]
+    # 1. Just take the first few batches normally instead of searching
+    # This is 100x faster than the 'next(enumerate...)' approach
+    collected_frames = []
+    count = 0
+    for batch in dataloader:
+        images = batch["image"].to(device)
+        masks = batch["mask"].to(device)
 
-        if len(indices) <= frames_per_clip:
-            sampled = indices
-        else:
-            sample_ids = np.linspace(
-                0, len(indices) - 1,
-                frames_per_clip,
-                dtype=int
-            )
-            sampled = [indices[i] for i in sample_ids]
+        logits = model(images)
+        preds = torch.argmax(logits, dim=1)
 
-        rows = []
-
-        for batch_idx, i in sampled:
-            batch = next(
-                b for j, b in enumerate(dataloader)
-                if j == batch_idx
-            )
-
-            images = batch["image"].to(device)
-            masks = batch["mask"].to(device)
-
-            logits = model(images)
-            print("logits: ", logits.shape)
-            probs = torch.softmax(logits, dim=1)
-            print("probs: ", probs.shape)
-            preds = torch.argmax(probs, dim=1)
-            print("preds: ", preds.shape)
-            print(preds.min(), preds.max())
-
+        for i in range(images.shape[0]):
             img = denormalize(images[i].cpu(), mean, std)
+            # IMPORTANT: OpenCV is BGR, WandB is RGB. Convert here!
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            gt_mask = masks[i].cpu().numpy()
-            pr_mask = preds[i].cpu().numpy()
+            gt_m = masks[i].cpu().numpy()
+            pr_m = preds[i].cpu().numpy()
 
-            gt_overlay = apply_mask_overlay(img, gt_mask, palette)
-            pr_overlay = apply_mask_overlay(img, pr_mask, palette)
+            gt_ov = apply_mask_overlay(img_rgb, gt_m, palette)
+            pr_ov = apply_mask_overlay(img_rgb, pr_m, palette)
 
-            row = np.concatenate(
-                [img, gt_overlay, pr_overlay],
-                axis=1
-            )
-            rows.append(row)
+            # Optional: Resize here to make upload faster
+            # row = np.concatenate([img_rgb, gt_ov, pr_ov], axis=1)
+            # row = cv2.resize(row, (0,0), fx=0.5, fy=0.5)
 
-        grids.append(np.concatenate(rows, axis=0))
+            collected_frames.append(np.concatenate([img_rgb, gt_ov, pr_ov], axis=1))
+
+            if len(collected_frames) >= (n_clips * frames_per_clip):
+                break
+        if len(collected_frames) >= (n_clips * frames_per_clip):
+            break
+
+    # 2. Chunk frames into grids
+    for i in range(0, len(collected_frames), frames_per_clip):
+        clip_frames = collected_frames[i: i + frames_per_clip]
+        grids.append(np.concatenate(clip_frames, axis=0))
 
     return grids
