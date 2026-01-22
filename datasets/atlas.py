@@ -175,7 +175,6 @@ class AtlasDataset(Dataset):
         if self.transform:
             image, mask = self.transform(image, mask)
 
-        print(type(image), type(mask))
         # 3. Convert to float and SCALE to [0, 1]
         # The 'scale=True' is the critical missing piece!
         image = T.functional.to_dtype(image, dtype=torch.float32, scale=True)

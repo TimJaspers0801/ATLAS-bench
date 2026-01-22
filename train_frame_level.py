@@ -217,7 +217,6 @@ def train(args):
 
                     loss = layer_loss if seg_loss is None else seg_loss + layer_loss
             else:
-                print("training standard model")
                 outputs = model(images)
                 loss = criterion(outputs, masks)
 
