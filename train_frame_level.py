@@ -266,6 +266,8 @@ def train(args):
                 std=val_loader.dataset.std,
             )
 
+            print(len(grids))
+
             for i, grid in enumerate(grids):
                 wandb.log({
                     f"Val clip {i}": wandb.Image(
@@ -351,7 +353,6 @@ if __name__ == "__main__":
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--img_size", type=int, default=256)
     parser.add_argument("--log_interval", type=int, default=10)
-    parser.add_argument("--visual_log", type=int, default=50, help="Log images every N steps")
     parser.add_argument("--experiment_name", type=str, required=True, help="Name of this run")
     parser.add_argument("--output_dir", type=str, default="outputs", help="Where to save models and logs")
     parser.add_argument("--url", type=str, default=None, help="URL to pretrained weights (SurgeNet or others)")
