@@ -1,12 +1,11 @@
 import random
 import zipfile
-from pathlib import Path
 from PIL import Image
 
-import numpy as np
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.v2 as T
+from torchvision import tv_tensors
 
 
 class AtlasDataset(Dataset):
@@ -163,10 +162,10 @@ class AtlasDataset(Dataset):
             image = self._read_from_zip(zf, sample["img"]).convert("RGB")
             mask = self._read_from_zip(zf, sample["mask"]).convert("L")
 
-        # 1. Convert PIL images to Tensors immediately
-        # Using T.functional is often cleaner inside __getitem__
-        image = T.functional.to_image(image)
-        mask = T.functional.to_mask(mask)
+        # 1. Convert to TVTensors instead of using functional.to_mask
+        # This automatically converts PIL -> Tensor and tags the type
+        image = tv_tensors.Image(image)
+        mask = tv_tensors.Mask(mask)
 
         # 2. Apply transforms (v2 handles (Tensor, Tensor) pairs perfectly)
         if self.transform:
