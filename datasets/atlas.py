@@ -163,14 +163,18 @@ class AtlasDataset(Dataset):
             image = self._read_from_zip(zf, sample["img"]).convert("RGB")
             mask = self._read_from_zip(zf, sample["mask"]).convert("L")
 
-        # Convert to tensors
-        image = T.ToImage()(image)
+        # Convert mask to long tensor
         mask = torch.from_numpy(np.array(mask)).long()
 
+        # Apply transforms first if provided
         if self.transform:
             image, mask = self.transform(image, mask)
 
-        image = T.Normalize(self.mean, self.std)(image)
+        # Convert image to float tensor in [0,1]
+        image = T.ToImageTensor()(image)  # v2 equivalent of ToTensor
+
+        # Normalize
+        image = T.Normalize(mean=self.mean, std=self.std)(image)
 
         return {
             "image": image,
