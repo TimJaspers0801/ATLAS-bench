@@ -40,7 +40,6 @@ def apply_mask_overlay(image, mask, palette, ignore_index=255):
     """
 
     color_mask = np.zeros_like(image)
-    mask = mask.squeeze()
 
     for class_id, color in palette.items():
         color_mask[mask == class_id] = color
@@ -93,7 +92,7 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
             # IMPORTANT: OpenCV is BGR, WandB is RGB. Convert here!
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-            gt_m = masks[i].cpu().numpy()
+            gt_m = masks[i].cpu().numpy().squeeze()
             pr_m = preds[i].cpu().numpy()
 
             print("image shape: ", img.shape)
