@@ -1,9 +1,10 @@
 import torch
 import timm
-from models.eomt import eomt
+from models.eomt import eomt, vit
 from models.surgenet import convnextv2
 from models.surgenet import pvtv2
 from models.surgenet import metaformer
+
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
 
@@ -62,8 +63,8 @@ def load_dinov1_b():
 ###################################
 def load_dinov2_s():
     # ViT-s
-    model = timm.create_model(
-        'vit_small_patch14_dinov2',
+    model = vit.ViT(
+        backbone_name='vit_small_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
@@ -75,8 +76,8 @@ def load_dinov2_s():
 
 # ViT-b
 def load_dinov2_b():
-    model = timm.create_model(
-        'vit_base_patch14_dinov2',
+    model = vit.ViT(
+        backbone_name='vit_base_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
@@ -88,8 +89,8 @@ def load_dinov2_b():
 
 # ViT-l
 def load_dinov2_l():
-    model = timm.create_model(
-        'vit_large_patch14_dinov2',
+    model = vit.ViT(
+        backbone_name='vit_large_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
