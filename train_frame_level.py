@@ -185,6 +185,7 @@ def train(args):
         best_epoch = None
 
     for epoch in range(args.epochs):
+        print("start training")
         model.train()
         train_loss = 0
 
@@ -192,6 +193,7 @@ def train(args):
         for step, batch in enumerate(pbar):
             images = batch["image"].to(device)
             masks = batch["mask"].to(device)
+            print(images.shape, masks.shape)
 
             images, masks = images.to(device), masks.to(device).squeeze()
 
