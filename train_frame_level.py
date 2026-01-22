@@ -37,13 +37,8 @@ def train(args):
 
     # Define transforms
     train_transform = T.Compose([
-        T.RandomResizedCrop(
-            args.img_size,
-            scale=(0.8, 1.0),
-            interpolation=T.InterpolationMode.BICUBIC
-        ),
-        T.RandomHorizontalFlip(0.5),
-        T.RandomVerticalFlip(0.5),
+        T.Resize(args.img_size, interpolation=T.InterpolationMode.NEAREST),
+        T.CenterCrop(args.img_size),
     ])
 
     val_transform = T.Compose([

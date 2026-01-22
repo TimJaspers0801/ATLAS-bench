@@ -94,10 +94,6 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
             gt_m = masks[i].cpu().numpy().squeeze()
             pr_m = preds[i].cpu().numpy()
 
-            print("image shape: ", img.shape)
-            print("gt shape and pr shape", gt_m.shape, pr_m.shape)
-            print(np.unique(gt_m), np.unique(pr_m))
-
             gt_ov = apply_mask_overlay(img, gt_m, palette)
             pr_ov = apply_mask_overlay(img, pr_m, palette)
 
