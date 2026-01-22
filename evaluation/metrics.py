@@ -2,9 +2,6 @@ import numpy as np
 from pycocotools import mask as mask_utils
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
-import json
-import tempfile
-import os
 
 def compute_iou(pred, gt):
     pred = pred.astype(bool)

@@ -2,7 +2,7 @@ import torch
 from collections import defaultdict
 from tqdm import tqdm
 import numpy as np
-from metrics import compute_iou, compute_dice, SegmentationAPEvaluator
+from .metrics import compute_iou, compute_dice, SegmentationAPEvaluator
 
 
 def evaluate_model(model, dataloader, device, threshold=0.5):
