@@ -30,7 +30,7 @@ def train(args):
     wandb.init(project="Atlas",
                config=vars(args),
                name=args.experiment_name,
-               dir=r"C:\Users\20172619\wandb\wandb")
+               dir="wandb")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
