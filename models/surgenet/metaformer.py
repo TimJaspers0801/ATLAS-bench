@@ -915,7 +915,7 @@ urls = {
 def caformer_s18_surgenetxl(num_classes=0):
     model = MetaFormerFPN(
         num_classes=num_classes,
-        pretrained='SurgeNetXL',
+        pretrained='SurgeNet',
         pretrained_weights=urls['SurgeNetXL'],
     )
     return model
