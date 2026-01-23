@@ -205,13 +205,13 @@ def train(args):
                 for i, (mask_logits, class_logits) in enumerate(zip(mask_logits_per_layer, class_logits_per_layer)):
                     # slice logits to only those images that have masks
                     # call EoMT/M2F loss to get dict of losses for this layer
-                    losses_dict = train_criterion(
+                    losses_dict = criterion(
                         masks_queries_logits=mask_logits,
                         class_queries_logits=class_logits,
                         targets=seg_targets,
                     )
                     # reduce this layer's losses to a single scalar using the module helper
-                    layer_loss = train_criterion.loss_total(losses_dict)  # scalar tensor
+                    layer_loss = criterion.loss_total(losses_dict)  # scalar tensor
 
                     loss = layer_loss if seg_loss is None else seg_loss + layer_loss
             else:
