@@ -58,6 +58,7 @@ class EoMT(nn.Module):
     def _predict(self, x: torch.Tensor):
         q = x[:, : self.num_q, :]
 
+        class_logits = self.class_head(q)
 
         start_idx = self.num_q + getattr(self.encoder.backbone, "num_prefix_tokens", 0)
         x_patch = x[:, start_idx :, :]
@@ -69,7 +70,7 @@ class EoMT(nn.Module):
             "bqc, bchw -> bqhw", self.mask_head(q), self.upscale(x_patch)
         )
 
-        return mask_logits
+        return mask_logits, class_logits
 
     @torch.compiler.disable
     def _disable_attn_mask(self, attn_mask, prob):
