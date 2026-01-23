@@ -24,7 +24,8 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
             gt_masks = batch["mask"].to(device)
 
             if is_eomt:
-                probs = model(images, return_semantic=True)
+                outputs = model(images, return_semantic=True)
+                probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1, keepdim=True)
                 scores = probs.max(dim=1)[0].mean(dim=(1, 2))
             else:
