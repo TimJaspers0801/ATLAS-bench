@@ -109,7 +109,6 @@ def load_dinov2_l():
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitl'])
-    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-l weights with msg:\n", msg)
     return model
