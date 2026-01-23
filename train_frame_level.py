@@ -136,7 +136,7 @@ def train(args):
 
     if 'eomt' in args.model.lower():
         from loss.eomt_loss import EoMTLoss
-        train_criterion = EoMTLoss(num_points=12544,
+        criterion = EoMTLoss(num_points=12544,
                             oversample_ratio=3.0,
                             importance_sample_ratio=0.75,
                             mask_coefficient=5.0,
