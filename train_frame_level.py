@@ -200,7 +200,6 @@ def train(args):
 
                 # accumulate scalar losses across layers
                 seg_loss = None
-                n_layers = len(mask_logits_per_layer)
 
                 for i, (mask_logits, class_logits) in enumerate(zip(mask_logits_per_layer, class_logits_per_layer)):
                     # slice logits to only those images that have masks

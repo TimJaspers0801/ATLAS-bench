@@ -362,6 +362,7 @@ class EoMT(nn.Module):
 
         # stitch crops back to full images
         logits = self.revert_window_logits_semantic(crop_logits, origins, img_sizes)
+
         return logits
 
 
