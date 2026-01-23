@@ -56,83 +56,84 @@ FRAMES_PERCENTAGE=100
 # Experiment — pvtv2 surgenet
 # ===========================
 
-#EXPERIMENT_NAME=pvtv2_atlas
-#
-#echo "========================================"
-#echo "Running ${EXPERIMENT_NAME}"
-#echo "========================================"
-#
-#srun apptainer exec --nv \
-#  --bind ${PROJECT_ROOT}:/workspace \
-#  --bind ${DATA_ROOT_HOST}:/data \
-#  --bind ${OUTPUT_ROOT_HOST}:/outputs \
-#  ${CONTAINER} \
-#  python3 /workspace/train_frame_level.py \
-#    --data_path ${DATA_ZIP} \
-#    --experiment_name ${EXPERIMENT_NAME} \
-#    --model pvtv2 \
-#    --num_classes ${NUM_CLASSES} \
-#    --epochs ${EPOCHS} \
-#    --batch_size ${BATCH_SIZE} \
-#    --img_size ${IMG_SIZE} \
-#    --output_dir ${OUTPUT_PATH} \
-#    --num_workers ${NUM_WORKERS} \
-#    --first_frame_only
+EXPERIMENT_NAME=pvtv2_atlas
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${DATA_ROOT_HOST}:/data \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model pvtv2 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
 
 
 # ===========================
 # Experiment — convnext surgenet
 # ===========================
 
-#EXPERIMENT_NAME=convnextv2_atlas
-#
-#echo "========================================"
-#echo "Running ${EXPERIMENT_NAME}"
-#echo "========================================"
-#
-#srun apptainer exec --nv \
-#  --bind ${PROJECT_ROOT}:/workspace \
-#  --bind ${DATA_ROOT_HOST}:/data \
-#  --bind ${OUTPUT_ROOT_HOST}:/outputs \
-#  ${CONTAINER} \
-#  python3 /workspace/train_frame_level.py \
-#    --data_path ${DATA_ZIP} \
-#    --experiment_name ${EXPERIMENT_NAME} \
-#    --model convnextv2 \
-#    --num_classes ${NUM_CLASSES} \
-#    --epochs ${EPOCHS} \
-#    --batch_size ${BATCH_SIZE} \
-#    --img_size ${IMG_SIZE} \
-#    --output_dir ${OUTPUT_PATH} \
-#    --num_workers ${NUM_WORKERS} \
-#    --first_frame_only
+EXPERIMENT_NAME=convnextv2_atlas
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${DATA_ROOT_HOST}:/data \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model convnextv2 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
 
 # ===========================
 # Experiment — caformer surgenet
 # ===========================
-#
-#EXPERIMENT_NAME=caformer_atlas
-#
-#echo "========================================"
-#echo "Running ${EXPERIMENT_NAME}"
-#echo "========================================"
-#
-#srun apptainer exec --nv \
-#  --bind ${PROJECT_ROOT}:/workspace \
-#  --bind ${DATA_ROOT_HOST}:/data \
-#  --bind ${OUTPUT_ROOT_HOST}:/outputs \
-#  ${CONTAINER} \
-#  python3 /workspace/train_frame_level.py \
-#    --data_path ${DATA_ZIP} \
-#    --experiment_name ${EXPERIMENT_NAME} \
-#    --model caformer \
-#    --num_classes ${NUM_CLASSES} \
-#    --epochs ${EPOCHS} \
-#    --batch_size ${BATCH_SIZE} \
-#    --img_size ${IMG_SIZE} \
-#    --output_dir ${OUTPUT_PATH} \
-#    --num_workers ${NUM_WORKERS} \
-#    --first_frame_only
+
+EXPERIMENT_NAME=caformer_atlas
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${DATA_ROOT_HOST}:/data \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model caformer \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
+
 
 # ===========================
 # Experiment — surgenetxl surgenet
@@ -159,7 +160,7 @@ srun apptainer exec --nv \
     --img_size ${IMG_SIZE} \
     --output_dir ${OUTPUT_PATH} \
     --num_workers ${NUM_WORKERS} \
-    --first_frame_only
+    --visualize
 
 echo "========================================"
 echo "Job finished"

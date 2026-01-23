@@ -77,7 +77,7 @@ srun apptainer exec --nv \
     --img_size ${IMG_SIZE} \
     --output_dir ${OUTPUT_PATH} \
     --num_workers ${NUM_WORKERS} \
-    --first_frame_only
+    --visualize
 
 echo "========================================"
 echo "Job finished"

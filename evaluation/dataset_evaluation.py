@@ -28,6 +28,11 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
                 probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1, keepdim=True)
                 scores = probs.max(dim=1)[0].mean(dim=(1, 2))
+                print("outputs shape:", outputs.shape, "probs min/max mean:", probs.min().item(), probs.max().item(),
+                      probs.mean().item())
+                fg_mass = probs[:, 1:, ...].sum(dim=1)  # total foreground probability per pixel
+                print("foreground mass stats:", fg_mass.mean().item(), fg_mass.min().item(), fg_mass.max().item())
+
             else:
                 outputs = model(images)
                 probs = torch.softmax(outputs, dim=1)
