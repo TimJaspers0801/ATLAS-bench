@@ -166,7 +166,7 @@ def train(args):
             weight_decay=weight_decay,
             llrd_layer_decay=llrd_factor,
         )
-
+        criterion = nn.CrossEntropyLoss(ignore_index=255)
     else:
         criterion = nn.CrossEntropyLoss(ignore_index=255)
 
