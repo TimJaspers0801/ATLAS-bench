@@ -45,4 +45,3 @@ from .linear_head import LinearHead
 from .setr_naive_head import NaiveHead
 from .setr_pup_head import PUPHead
 from .setr_mla_head import MLAHead
-from .segmenter_transformer_head import MaskTransformerHead
