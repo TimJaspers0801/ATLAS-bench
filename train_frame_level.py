@@ -148,8 +148,8 @@ def train(args):
         param_groups = get_param_groups_llrd(model, base_lr=base_lr, weight_decay=weight_decay,
                                              llrd_layer_decay=llrd_factor)
 
-
-    criterion = nn.CrossEntropyLoss(ignore_index=255)
+    else:
+        criterion = nn.CrossEntropyLoss(ignore_index=255)
 
 
     if 'eomt' in args.model.lower():
