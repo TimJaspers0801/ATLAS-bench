@@ -198,6 +198,14 @@ def train(args):
                 from loss.eomt_loss import convert_semantic_to_eomt_targets
                 seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=args.num_classes)
 
+                ml = mask_logits_per_layer[-1]
+                print(
+                    "MASK LOGITS:",
+                    "raw min/max/mean =", ml.min().item(), ml.max().item(), ml.mean().item(),
+                    "| sigmoid min/max/mean =", ml.sigmoid().min().item(), ml.sigmoid().max().item(),
+                    ml.sigmoid().mean().item()
+                )
+
                 # accumulate scalar losses across layers
                 seg_loss = None
 
