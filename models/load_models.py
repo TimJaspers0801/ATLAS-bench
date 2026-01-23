@@ -4,6 +4,7 @@ from models.eomt import eomt, vit
 from models.surgenet import convnextv2
 from models.surgenet import pvtv2
 from models.surgenet import metaformer
+from models.decoders.vit import ViTSegmenter
 
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
@@ -155,6 +156,36 @@ def load_dinov3_l():
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv3 ViT-l weights with msg:\n", msg)
     return model
+
+
+###########################################
+### vit with linear head ###
+###########################################
+def load_lh_vit_s_dinov2(n_classes):
+    vit = load_dinov2_s()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+def load_lh_vit_b_dinov2(n_classes):
+    vit = load_dinov2_b()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+def load_lh_vit_l_dinov2(n_classes):
+    vit = load_dinov2_l()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+
 
 ###########################################
 ### Loading eomt models ###

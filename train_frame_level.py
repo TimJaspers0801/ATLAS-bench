@@ -13,7 +13,8 @@ import pandas as pd
 
 from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt_l_dinov2,\
                                load_eomt_s_dinov3, load_eomt_b_dinov3, load_eomt_l_dinov3, \
-                               load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2, load_surgenetxl_caformer_s18
+                               load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2, load_surgenetxl_caformer_s18, \
+                               load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2
 
 from models.eomt.eomt import get_param_groups_llrd
 from evaluation.dataset_evaluation import evaluate_model
@@ -99,11 +100,12 @@ def train(args):
     print(f"Training on {len(train_dataset)} samples, Validation on {len(val_dataset)} samples. Testing on {len(test_dataset)}.")
 
     # Model
-    if 'eomt' in args.model:
+    if 'eomt' in args.model or 'vit' in args.model.lower():
         base_lr = 1e-4
         weight_decay = 0.05
         llrd_factor = 0.8
-        is_eomt = True
+        if 'eomt' in args.model.lower():
+            is_eomt = True
 
     if args.model == 'eomt-s-dinov2':
         model = load_eomt_s_dinov2(n_classes=args.num_classes, num_q=100) # args.num_classes
@@ -117,6 +119,15 @@ def train(args):
         model = load_eomt_b_dinov3(n_classes=args.num_classes, num_q=100)
     elif args.model == 'eomt-l-dinov3':
         model = load_eomt_l_dinov3(n_classes=args.num_classes, num_q=100)
+
+    # simple linear head models
+    elif args.model == "lh-vit-s-dinov2":
+        model = load_lh_vit_s_dinov2(n_classes=args.num_classes)
+    elif args.model == "lh-vit-b-dinov2":
+        model = load_lh_vit_b_dinov2(n_classes=args.num_classes)
+    elif args.model == "lh-vit-l-dinov2":
+        model = load_lh_vit_l_dinov2(n_classes=args.num_classes)
+
     elif args.model == 'convnextv2':
         model = load_surgenet_convnextv2_tiny(num_classes=args.num_classes)
     elif args.model == 'caformer':
@@ -147,12 +158,20 @@ def train(args):
                             ).to(device)
         param_groups = get_param_groups_llrd(model, base_lr=base_lr, weight_decay=weight_decay,
                                              llrd_layer_decay=llrd_factor)
+    elif 'vit' in args.model.lower():
+        from models.decoders.vit import get_param_groups_llrd_vit_segmenter
+        param_groups = get_param_groups_llrd_vit_segmenter(
+            model,
+            base_lr=args.lr,
+            weight_decay=weight_decay,
+            llrd_layer_decay=llrd_factor,
+        )
 
     else:
         criterion = nn.CrossEntropyLoss(ignore_index=255)
 
 
-    if 'eomt' in args.model.lower():
+    if 'eomt' in args.model.lower() or 'vit' in args.model.lower():
         optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
     else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)

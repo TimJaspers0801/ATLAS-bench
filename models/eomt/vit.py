@@ -2,12 +2,11 @@
 # © 2025 Mobile Perception Systems Lab at TU/e. All rights reserved.
 # Licensed under the MIT License.
 # ---------------------------------------------------------------
-
-
 from typing import Optional
 import timm
 import torch
 import torch.nn as nn
+from models.decoders import build_decoder
 
 
 class ViT(nn.Module):
@@ -36,3 +35,4 @@ class ViT(nn.Module):
 
         self.register_buffer("pixel_mean", pixel_mean)
         self.register_buffer("pixel_std", pixel_std)
+
