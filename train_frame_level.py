@@ -106,17 +106,17 @@ def train(args):
         is_eomt = True
 
     if args.model == 'eomt-s-dinov2':
-        model = load_eomt_s_dinov2(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_s_dinov2(n_classes=args.num_classes, num_q=100) # args.num_classes
     elif args.model == 'eomt-b-dinov2':
-        model = load_eomt_b_dinov2(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_b_dinov2(n_classes=args.num_classes, num_q=100)
     elif args.model == 'eomt-l-dinov2':
-        model = load_eomt_l_dinov2(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_l_dinov2(n_classes=args.num_classes, num_q=100)
     elif args.model == 'eomt-s-dinov3':
-        model = load_eomt_s_dinov3(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_s_dinov3(n_classes=args.num_classes, num_q=100)
     elif args.model == 'eomt-b-dinov3':
-        model = load_eomt_b_dinov3(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_b_dinov3(n_classes=args.num_classes, num_q=100)
     elif args.model == 'eomt-l-dinov3':
-        model = load_eomt_l_dinov3(n_classes=args.num_classes, num_q=args.num_classes)
+        model = load_eomt_l_dinov3(n_classes=args.num_classes, num_q=100)
     elif args.model == 'convnextv2':
         model = load_surgenet_convnextv2_tiny(num_classes=args.num_classes)
     elif args.model == 'caformer':

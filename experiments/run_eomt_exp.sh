@@ -70,7 +70,7 @@ srun apptainer exec --nv \
   python3 /workspace/train_frame_level.py \
     --data_path ${DATA_ZIP} \
     --experiment_name ${EXPERIMENT_NAME} \
-    --model eomt-s-dinov2 \
+    --model eomt-b-dinov2 \
     --num_classes ${NUM_CLASSES} \
     --epochs ${EPOCHS} \
     --batch_size ${BATCH_SIZE} \

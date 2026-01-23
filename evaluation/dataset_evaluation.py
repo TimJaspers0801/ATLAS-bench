@@ -25,7 +25,6 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
 
             if is_eomt:
                 outputs = model(images, return_semantic=True)
-                print(outputs.shape)
             else:
                 outputs = model(images)
 
