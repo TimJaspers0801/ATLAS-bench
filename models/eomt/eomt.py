@@ -297,18 +297,24 @@ class EoMT(nn.Module):
         return out
 
     @staticmethod
-    def to_per_pixel_logits_semantic(mask_logits: torch.Tensor, class_logits: torch.Tensor):
+    def to_per_pixel_logits_semantic(mask_logits, class_logits):
         """
-        Convert query-level masks + class logits to per-pixel class logits.
-        mask_logits: [B, Q, H, W]
-        class_logits: [B, Q, num_classes+1]
-        returns: [B, num_classes, H, W]
+        Returns per-pixel *logits* including background channel at index 0
         """
-        return torch.einsum(
-            "bqhw, bqc -> bchw",
-            mask_logits.sigmoid(),
-            class_logits.softmax(dim=-1)[..., :-1],
-        )
+        B, Q, H, W = mask_logits.shape
+        num_classes = class_logits.shape[-1] - 1  # excluding no-object
+
+        mask_probs = mask_logits.sigmoid()
+        class_probs = class_logits.softmax(dim=-1)[..., :-1]  # drop no-object
+
+        # foreground logits
+        fg_logits = torch.einsum("bqhw,bqc->bchw", mask_probs, class_probs)
+
+        # background = 1 - sum(foreground)
+        bg_logits = 1.0 - fg_logits.sum(dim=1, keepdim=True)
+        bg_logits = bg_logits.clamp(min=1e-6)
+
+        return torch.cat([bg_logits, fg_logits], dim=1)
 
     @staticmethod
     @torch.compiler.disable

@@ -45,19 +45,15 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
 
             if is_eomt:
                 outputs = model(images, return_semantic=True)
+                preds = torch.argmax(outputs, dim=1, keepdim=True)
+                scores = probs.max(dim=1)[0].mean(dim=(1, 2))
+                classes_to_eval = range(1, num_classes+1)  # Skip background 0
             else:
                 outputs = model(images)
-
-            # Determine Preds
-            if outputs.shape[1] == 1:
-                preds = (torch.sigmoid(outputs) > threshold).long()
-                scores = torch.sigmoid(outputs).mean(dim=(2, 3))
-                classes_to_eval = [1]
-            else:
                 probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1, keepdim=True)
                 scores = probs.max(dim=1)[0].mean(dim=(1, 2))
-                classes_to_eval = range(1, num_classes)  # Skip background 0
+                classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
             for i in range(len(images)):
                 # --- AP Handling ---
