@@ -297,24 +297,39 @@ class EoMT(nn.Module):
         return out
 
     @staticmethod
-    def to_per_pixel_logits_semantic(mask_logits, class_logits):
+    def to_per_pixel_logits_semantic(mask_logits: torch.Tensor, class_logits: torch.Tensor, eps: float = 1e-6):
         """
-        Returns per-pixel *logits* including background channel at index 0
+        Correctly combine query masks and per-query class scores into per-pixel logits.
+
+        - mask_logits: [B, Q, H, W]  (raw mask logits per query)
+        - class_logits: [B, Q, C+1]  (raw query-class logits; includes background as last channel)
+        Returns:
+        - per-pixel logits (B, C, H, W) for the C foreground classes (background excluded).
+          The outputs are logits such that softmax(outputs) == normalized foreground probabilities
+          (i.e., we normalize out the background mass so the returned C channels sum to 1).
         """
-        B, Q, H, W = mask_logits.shape
-        num_classes = class_logits.shape[-1] - 1  # excluding no-object
+        # class probabilities per query *including background*
+        class_probs = class_logits.softmax(dim=-1)  # (B, Q, C+1)
+        # mask probabilities per query
+        mask_probs = mask_logits.sigmoid()  # (B, Q, H, W)
 
-        mask_probs = mask_logits.sigmoid()
-        class_probs = class_logits.softmax(dim=-1)[..., :-1]  # drop no-object
+        # combine -> per-pixel class probabilities INCLUDING background
+        all_probs = torch.einsum("bqhw,bqc->bchw", mask_probs, class_probs)  # (B, C+1, H, W)
 
-        # foreground logits
-        fg_logits = torch.einsum("bqhw,bqc->bchw", mask_probs, class_probs)
+        # separate foreground and background
+        foreground_probs = all_probs[:, :-1, :, :]  # (B, C, H, W)
+        background_prob = all_probs[:, -1:, :, :]  # (B, 1, H, W)
 
-        # background = 1 - sum(foreground)
-        bg_logits = 1.0 - fg_logits.sum(dim=1, keepdim=True)
-        bg_logits = bg_logits.clamp(min=1e-6)
+        # Now *renormalize foreground* so softmax(logits) will equal foreground_probs_normalized.
+        # This is needed because some probability mass lives in background; many downstream losses
+        # expect logits that normalize only over foreground classes.
+        fg_sum = foreground_probs.sum(dim=1, keepdim=True).clamp(min=eps)  # (B,1,H,W)
+        fg_norm = foreground_probs / fg_sum  # (B, C, H, W) now sums to 1 across foreground classes
 
-        return torch.cat([bg_logits, fg_logits], dim=1)
+        # Convert to logits compatible with CrossEntropyLoss:
+        logits = torch.log(fg_norm.clamp(min=eps))
+
+        return logits  # (B, C, H, W)
 
     @staticmethod
     @torch.compiler.disable

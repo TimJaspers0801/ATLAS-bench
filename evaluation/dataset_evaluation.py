@@ -22,26 +22,6 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
         for batch in tqdm(dataloader, desc="Evaluating"):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
-            ####################
-            print("images min/max mean/std:", images.min().item(), images.max().item(), images.mean().item(),
-                  images.std().item())
-            print("gt mask unique vals:", [np.unique(t.cpu().numpy()) for t in gt_masks[:2]])
-
-            # If eomt:
-            with torch.no_grad():
-                out = model(images, return_semantic=True) if is_eomt else model(images)
-            print("output shape:", out.shape, "dtype:", out.dtype, "min/max/mean/std:",
-                  out.min().item(), out.max().item(), out.mean().item(), out.std().item())
-
-            # If eomt (per-pixel logits):
-            probs = torch.softmax(out, dim=1)
-            print("per-pixel softmax sum (should be ~1) - per-image mean:", probs.sum(dim=1).mean().item())
-
-            # quick check predicted labels distribution
-            preds = torch.argmax(probs, dim=1)  # B,H,W
-            for i in range(min(3, preds.shape[0])):
-                print("Pred unique classes image", i, np.unique(preds[i].cpu().numpy()))
-            ####################
 
             if is_eomt:
                 outputs = model(images, return_semantic=True)
