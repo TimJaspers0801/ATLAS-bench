@@ -144,7 +144,6 @@ def train(args):
 
     model.to(device)
 
-
     if 'eomt' in args.model.lower():
         from loss.eomt_loss import EoMTLoss
         criterion = EoMTLoss(num_points=12544,

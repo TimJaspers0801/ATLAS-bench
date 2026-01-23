@@ -4,15 +4,14 @@
 #SBATCH --cpus-per-task=16                      # Specify the number of CPUs/task
 #SBATCH --gpus=1                                # Specify the number of GPUs to use
 #SBATCH --partition=gpu_h100                    # Specify the node partition
-#SBATCH --time=12:00:00                         # Specify the maximum time the job can run
+#SBATCH --time=24:00:00                         # Specify the maximum time the job can run
 
 export WANDB_API_KEY=1cf878a1b1aafcd37a1f6e6ba8fdd18ba1c4affb
-export WANDB_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb
-export WANDB_CONFIG_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb
-export WANDB_CACHE_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb
+export WANDB_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb/lh
+export WANDB_CONFIG_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb/lh
+export WANDB_CACHE_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb/lh
 export WANDB_START_METHOD="thread"
 wandb login
-
 
 
 # ===========================
@@ -46,17 +45,17 @@ cd ${PROJECT_ROOT} || exit 1
 DATA_ZIP=/data/atlas.zip
 OUTPUT_PATH=/outputs
 IMG_SIZE=336
-EPOCHS=50
-BATCH_SIZE=64
+EPOCHS=10
+BATCH_SIZE=128
 NUM_CLASSES=47
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 
 # ===========================
-# Experiment — EoMT DINOv2
+# Experiment — EoMT DINOv2 - s
 # ===========================
 
-EXPERIMENT_NAME=lh_dinov2_atlas
+EXPERIMENT_NAME=lh_vits_dinov2_atlas
 
 echo "========================================"
 echo "Running ${EXPERIMENT_NAME}"
@@ -77,7 +76,63 @@ srun apptainer exec --nv \
     --img_size ${IMG_SIZE} \
     --output_dir ${OUTPUT_PATH} \
     --num_workers ${NUM_WORKERS} \
-    --first_frame_only \
+    --visualize
+
+
+# ===========================
+# Experiment — EoMT DINOv2
+# ===========================
+
+EXPERIMENT_NAME=lh_vitb_dinov2_atlas
+BATCH_SIZE=64
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${DATA_ROOT_HOST}:/data \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model lh-vit-b-dinov2 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
+
+# ===========================
+# Experiment — EoMT DINOv2
+# ===========================
+
+EXPERIMENT_NAME=lh__vitl_dinov2_atlas
+BATCH_SIZE=16
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${DATA_ROOT_HOST}:/data \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model lh-vit-s-dinov2 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
     --visualize
 
 echo "========================================"
