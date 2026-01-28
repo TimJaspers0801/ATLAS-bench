@@ -410,7 +410,7 @@ class EoMT(nn.Module):
 
 ### helper functions for model training
 
-def get_vit_layer_id(param_name: str, num_backbone_blocks: int, num_prefix_tokens: int = 0):
+def get_vit_layer_id(param_name: str, num_backbone_blocks: int):
     """
     Map parameter name -> layer id integer (0..num_backbone_blocks+1)
     - 0: patch embed / embeddings / pos_embed / patch_embed
