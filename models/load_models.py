@@ -169,8 +169,8 @@ def load_endofm(num_classes=1, device='cuda'):
 
 def load_endovit(num_classes=1):
     """Load EndoViT model for semantic segmentation."""
-    from models.EndoViT.load_endovit import EndoViT
-    model = EndoViT(num_classes=num_classes)
+    from models.EndoViT.load_endovit import load_endovit
+    model = load_endovit(num_classes=num_classes)
     return model
 
 
