@@ -318,17 +318,47 @@ def load_lh_dinov2_vitb_336_surgenet2m(n_classes):
     return model
 
 # DINOv3 - ViT-Large 256 (SurgeNet2M)
+# Uses native DINOv3 architecture compatible with Meta-trained checkpoints
 def load_dinov3_vitl_256_surgenet2m():
-    model = ViT(
-        img_size=(256, 256),
+    from models.dinov3_native import DINOv3ViT
+    
+    backbone = DINOv3ViT(
+        img_size=256,
         patch_size=16,
-        backbone_name="facebook/dinov3-vitl16-pretrain-lvd1689m",
+        embed_dim=1024,
+        depth=24,
+        num_heads=16,
+        mlp_ratio=4.0,
     )
+    
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitl-256-surgenet2M.pth")
-    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
-    print(state_dict.keys())
-    msg = model.load_state_dict(state_dict, strict=False)
-    print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
+    if os.path.isfile(weight_path):
+        state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+        if isinstance(state_dict, dict):
+            if "teacher" in state_dict:
+                state_dict = state_dict["teacher"]
+            elif "model" in state_dict:
+                state_dict = state_dict["model"]
+            elif "state_dict" in state_dict:
+                state_dict = state_dict["state_dict"]
+        
+        # Strip common prefixes
+        if any(key.startswith("module.") for key in state_dict.keys()):
+            state_dict = {key[len("module."):]: value for key, value in state_dict.items()}
+        if any(key.startswith("backbone.") for key in state_dict.keys()):
+            state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
+        
+        msg = backbone.load_state_dict(state_dict, strict=False)
+        print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
+    
+    # Wrap in ViT class for compatibility
+    model = ViT.__new__(ViT)
+    model.backbone = backbone
+    model.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
+    model.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
+    model.register_buffer("pixel_mean", model.pixel_mean)
+    model.register_buffer("pixel_std", model.pixel_std)
+    
     return model
 
 def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
@@ -340,16 +370,47 @@ def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
     return model
 
 # DINOv3 - ViT-Base 256 (SurgeNet2M)
+# Uses native DINOv3 architecture compatible with Meta-trained checkpoints
 def load_dinov3_vitb_256_surgenet2m():
-    model = ViT(
-        img_size=(256, 256),
+    from models.dinov3_native import DINOv3ViT
+    
+    backbone = DINOv3ViT(
+        img_size=256,
         patch_size=16,
-        backbone_name="facebook/dinov3-vitb16-pretrain-lvd1689m",
+        embed_dim=768,
+        depth=12,
+        num_heads=12,
+        mlp_ratio=4.0,
     )
+    
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitb-256-surgenet2M.pth")
-    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
-    msg = model.load_state_dict(state_dict, strict=False)
-    print(f"\nLoaded DINOv3 ViT-Base 256 SurgeNet2M weights with msg:\n{msg}")
+    if os.path.isfile(weight_path):
+        state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+        if isinstance(state_dict, dict):
+            if "teacher" in state_dict:
+                state_dict = state_dict["teacher"]
+            elif "model" in state_dict:
+                state_dict = state_dict["model"]
+            elif "state_dict" in state_dict:
+                state_dict = state_dict["state_dict"]
+        
+        # Strip common prefixes
+        if any(key.startswith("module.") for key in state_dict.keys()):
+            state_dict = {key[len("module."):]: value for key, value in state_dict.items()}
+        if any(key.startswith("backbone.") for key in state_dict.keys()):
+            state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
+        
+        msg = backbone.load_state_dict(state_dict, strict=False)
+        print(f"\nLoaded DINOv3 ViT-Base 256 SurgeNet2M weights with msg:\n{msg}")
+    
+    # Wrap in ViT class for compatibility
+    model = ViT.__new__(ViT)
+    model.backbone = backbone
+    model.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
+    model.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
+    model.register_buffer("pixel_mean", model.pixel_mean)
+    model.register_buffer("pixel_std", model.pixel_std)
+    
     return model
 
 def load_lh_dinov3_vitb_256_surgenet2m(n_classes):
