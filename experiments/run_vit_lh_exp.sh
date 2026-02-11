@@ -50,7 +50,7 @@ NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 
 # ===========================
-# Experiment — EoMT DINOv2 - s
+# Experiment — LH DINOv2 - s
 # ===========================
 
 EXPERIMENT_NAME=lh_vits_dinov2_atlas
@@ -78,7 +78,7 @@ srun apptainer exec --nv \
 
 
 # ===========================
-# Experiment — EoMT DINOv2
+# Experiment — LH DINOv2 - b
 # ===========================
 
 EXPERIMENT_NAME=lh_vitb_dinov2_atlas
@@ -106,10 +106,10 @@ srun apptainer exec --nv \
     --visualize
 
 # ===========================
-# Experiment — EoMT DINOv2
+# Experiment — LH DINOv2 - l
 # ===========================
 
-EXPERIMENT_NAME=lh__vitl_dinov2_atlas
+EXPERIMENT_NAME=lh_vitl_dinov2_atlas
 BATCH_SIZE=16
 
 echo "========================================"
@@ -124,7 +124,7 @@ srun apptainer exec --nv \
   python3 /workspace/train_frame_level.py \
     --data_path ${DATA_ZIP} \
     --experiment_name ${EXPERIMENT_NAME} \
-    --model lh-vit-s-dinov2 \
+    --model lh-vit-l-dinov2 \
     --num_classes ${NUM_CLASSES} \
     --epochs ${EPOCHS} \
     --batch_size ${BATCH_SIZE} \
@@ -132,6 +132,15 @@ srun apptainer exec --nv \
     --output_dir ${OUTPUT_PATH} \
     --num_workers ${NUM_WORKERS} \
     --visualize
+
+# ===========================
+# Experiment — LH DINOv3 - s
+# ===========================
+EXPERIMENT_NAME=lh_vits_dinov3_atlas
+BATCH_SIZE=128
+
+
+
 
 echo "========================================"
 echo "Job finished"
