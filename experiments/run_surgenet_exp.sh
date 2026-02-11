@@ -29,7 +29,7 @@ echo "========================================"
 # Paths
 # ===========================
 
-PROJECT_ROOT=/gpfs/home1/tjaspers2/atlas
+PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
 DATA_ROOT_HOST=${PROJECT_ROOT}/data
 OUTPUT_ROOT_HOST=${PROJECT_ROOT}/outputs
 CONTAINER=${PROJECT_ROOT}/atlas.sif
@@ -43,10 +43,10 @@ cd ${PROJECT_ROOT} || exit 1
 # Experiment config
 # ===========================
 
-DATA_ZIP=/data/atlas.zip
+DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 OUTPUT_PATH=/outputs
 IMG_SIZE=256
-EPOCHS=10
+EPOCHS=1
 BATCH_SIZE=128
 NUM_CLASSES=47
 NUM_WORKERS=16
