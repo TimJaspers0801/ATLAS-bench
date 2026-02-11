@@ -5,7 +5,6 @@ from models.surgenet import convnextv2
 from models.surgenet import pvtv2
 from models.surgenet import metaformer
 from models.decoders.vit import ViTSegmenter
-from models.EndoViT import EndoViT
 from models.GastroNet5M import vit_base_14
 from models.dinov1 import vision_transformer as dinov1_vit
 from models.dinov2 import vision_transformer as dinov2_vit
@@ -20,6 +19,17 @@ except (ImportError, ModuleNotFoundError, AttributeError) as e:
     ENDOFM_AVAILABLE = False
     def EndoFM(*args, **kwargs):
         raise RuntimeError("EndoFM model is not available. Check module dependencies.")
+
+# Try to import EndoViT, but make it optional
+try:
+    from models.EndoViT import EndoViT
+    ENDOVIT_AVAILABLE = True
+except (ImportError, ModuleNotFoundError, AttributeError) as e:
+    print(f"Warning: Could not import EndoViT: {e}")
+    ENDOVIT_AVAILABLE = False
+    class EndoViT:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("EndoViT model is not available. Check module dependencies.")
 
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
@@ -220,6 +230,8 @@ def load_endofm(num_classes=1, device='cuda'):
     return model
 
 def load_endovit(num_classes=1):
+    if not ENDOVIT_AVAILABLE:
+        raise RuntimeError("EndoViT model could not be loaded. Check that all dependencies are installed.")
     model = EndoViT(num_classes=num_classes)
     return model
 
