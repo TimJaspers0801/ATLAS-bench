@@ -304,7 +304,8 @@ def load_dinov2_vitb_336_surgenet2m():
         pretrained=False,
     )
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv2-vitb-336-surgenet2M.pth")
-    msg = _load_surgenet2m_weights(model, weight_path)
+    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     return model
 
@@ -324,7 +325,8 @@ def load_dinov3_vitl_256_surgenet2m():
         backbone_name="facebook/dinov3-vitl16-pretrain-lvd1689m",
     )
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitl-256-surgenet2M.pth")
-    msg = _load_surgenet2m_weights(model, weight_path)
+    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
     return model
 
@@ -344,7 +346,8 @@ def load_dinov3_vitb_256_surgenet2m():
         backbone_name="facebook/dinov3-vitb16-pretrain-lvd1689m",
     )
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitb-256-surgenet2M.pth")
-    msg = _load_surgenet2m_weights(model, weight_path)
+    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv3 ViT-Base 256 SurgeNet2M weights with msg:\n{msg}")
     return model
 
