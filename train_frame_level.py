@@ -114,7 +114,7 @@ def train(args):
     print(f"Training on {len(train_dataset)} samples, Validation on {len(val_dataset)} samples. Testing on {len(test_dataset)}.")
 
     # Model
-    if 'vit' in args.model.lower() and args.model != 'endovit':
+    if 'vit' in args.model.lower() and args.model != 'endovit' and args.model != 'endofm':
         base_lr = 1e-4
         weight_decay = 0.05
         llrd_factor = 0.8
