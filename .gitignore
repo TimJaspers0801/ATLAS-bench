@@ -2,3 +2,4 @@ outputs
 data
 wandb
 weights
+models/EndoFM/checkpoints/*.pth
