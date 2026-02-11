@@ -689,9 +689,16 @@ def get_aux_token_vit(cfg, no_head=False, **kwargs):
 
 def build_vit_base_patch16_224():
     from .utils.parser import parse_args, load_config
+    import os
 
     opt = parse_args()
-    opt.cfg_file = "/home/20182054/code/tim_ssl_surgnet/SOTA_models/EndoFM/TransUNet/networks/vit/configs/Kinetics/TimeSformer_divST_8x32_224.yaml"
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    opt.cfg_file = os.path.join(
+        current_dir,
+        "configs",
+        "Kinetics",
+        "TimeSformer_divST_8x32_224.yaml",
+    )
     config = load_config(opt)
     model = get_vit_base_patch16_224(cfg=config)
 
