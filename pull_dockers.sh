@@ -3,7 +3,7 @@
 #SBATCH --ntasks=1                              # Specify the number of tasks
 #SBATCH --cpus-per-task=12                      # Specify the number of CPUs/task
 #SBATCH --gpus=1                                # Specify the number of GPUs to use
-#SBATCH --partition=gpu_a100                    # Specify the node partition
+#SBATCH --partition=gpu_h100                    # Specify the node partition
 #SBATCH --time=12:00:00                         # Specify the maximum time the job can run
 
 
