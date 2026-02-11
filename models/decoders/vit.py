@@ -84,20 +84,31 @@ class ViTBackbone(nn.Module):
     def forward(self, x):
         backbone = self.backbone_ref
         
-        # --- identical to ViT forward until tokens ---
-        x = backbone.patch_embed(x)
-        x = backbone._pos_embed(x)
-        x = backbone.patch_drop(x)
-        x = backbone.norm_pre(x)
-
-        for blk in backbone.blocks:
-            x = blk(x)
-
-        x = backbone.norm(x)
+        # Handle DINO models (which have prepare_tokens_with_masks method)
+        if hasattr(backbone, 'prepare_tokens_with_masks'):
+            # DINO model forward pass
+            x = backbone.prepare_tokens_with_masks(x)
+            for blk in backbone.blocks:
+                x = blk(x)
+            x = backbone.norm(x)
+        else:
+            # timm ViT model forward pass
+            x = backbone.patch_embed(x)
+            x = backbone._pos_embed(x)
+            x = backbone.patch_drop(x)
+            x = backbone.norm_pre(x)
+            for blk in backbone.blocks:
+                x = blk(x)
+            x = backbone.norm(x)
 
         # --- remove CLS token ---
-        if backbone.num_prefix_tokens > 0:
-            x = x[:, backbone.num_prefix_tokens :, :]
+        if hasattr(backbone, 'num_prefix_tokens'):
+            num_prefix = backbone.num_prefix_tokens
+        else:
+            num_prefix = 1  # default for timm models
+            
+        if num_prefix > 0:
+            x = x[:, num_prefix :, :]
 
         B, N, C = x.shape
         H, W = self.grid_size
