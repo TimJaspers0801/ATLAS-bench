@@ -10,27 +10,6 @@ from models.dinov1 import vision_transformer as dinov1_vit
 from models.dinov2 import vision_transformer as dinov2_vit
 from models.dinov3 import vision_transformer as dinov3_vit
 
-# Try to import EndoFM, but make it optional
-try:
-    from models.EndoFM import EndoFM
-    ENDOFM_AVAILABLE = True
-except (ImportError, ModuleNotFoundError, AttributeError) as e:
-    print(f"Warning: Could not import EndoFM: {e}")
-    ENDOFM_AVAILABLE = False
-    def EndoFM(*args, **kwargs):
-        raise RuntimeError("EndoFM model is not available. Check module dependencies.")
-
-# Try to import EndoViT, but make it optional
-try:
-    from models.EndoViT import EndoViT
-    ENDOVIT_AVAILABLE = True
-except (ImportError, ModuleNotFoundError, AttributeError) as e:
-    print(f"Warning: Could not import EndoViT: {e}")
-    ENDOVIT_AVAILABLE = False
-    class EndoViT:
-        def __init__(self, *args, **kwargs):
-            raise RuntimeError("EndoViT model is not available. Check module dependencies.")
-
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
 
@@ -222,18 +201,14 @@ def load_surgenetxl_caformer_s18(num_classes=1):
 ###########################################
 ### EndoFM and EndoViT models ###
 ###########################################
+# Note: EndoFM and EndoViT have hardcoded paths that don't work in the container environment.
+# These functions are kept for reference but will raise errors if called.
 
 def load_endofm(num_classes=1, device='cuda'):
-    if not ENDOFM_AVAILABLE:
-        raise RuntimeError("EndoFM model could not be loaded. Check that all dependencies are installed.")
-    model = EndoFM(num_classes=num_classes, device=device)
-    return model
+    raise RuntimeError("EndoFM model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
 
 def load_endovit(num_classes=1):
-    if not ENDOVIT_AVAILABLE:
-        raise RuntimeError("EndoViT model could not be loaded. Check that all dependencies are installed.")
-    model = EndoViT(num_classes=num_classes)
-    return model
+    raise RuntimeError("EndoViT model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
 
 
 ###########################################
