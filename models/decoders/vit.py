@@ -47,25 +47,35 @@ class ViT(nn.Module):
         self.register_buffer("pixel_std", pixel_std)
 
     def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
-        backbone.patch_embed = backbone.embeddings
-        backbone.patch_embed.patch_size = (
-            backbone.embeddings.config.patch_size,
-            backbone.embeddings.config.patch_size,
-        )
+        if hasattr(backbone, "vision_model"):
+            backbone = backbone.vision_model
+
+        embeddings = backbone.embeddings
+        backbone.patch_embed = embeddings
+        patch_size = embeddings.config.patch_size
+        backbone.patch_embed.patch_size = (patch_size, patch_size)
         backbone.patch_embed.grid_size = (
-            img_size[0] // backbone.embeddings.config.patch_size,
-            img_size[1] // backbone.embeddings.config.patch_size,
+            img_size[0] // patch_size,
+            img_size[1] // patch_size,
         )
 
-        backbone.embed_dim = backbone.embeddings.config.hidden_size
-        backbone.num_prefix_tokens = backbone.patch_embed.config.num_register_tokens + 1
-        backbone.blocks = backbone.layer
+        backbone.embed_dim = embeddings.config.hidden_size
+        num_register_tokens = getattr(embeddings.config, "num_register_tokens", 0)
+        backbone.num_prefix_tokens = num_register_tokens + 1
 
-        del (
-            backbone.patch_embed.mask_token,
-            backbone.embeddings,
-            backbone.layer,
-        )
+        if hasattr(backbone, "encoder") and hasattr(backbone.encoder, "layer"):
+            backbone.blocks = backbone.encoder.layer
+        else:
+            backbone.blocks = backbone.layer
+
+        if hasattr(backbone.patch_embed, "mask_token"):
+            del backbone.patch_embed.mask_token
+        if hasattr(backbone, "embeddings"):
+            del backbone.embeddings
+        if hasattr(backbone, "encoder"):
+            del backbone.encoder
+        elif hasattr(backbone, "layer"):
+            del backbone.layer
 
         return backbone
 

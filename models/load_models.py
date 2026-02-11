@@ -295,9 +295,15 @@ def load_lh_dinov2_vitb_336_surgenet2m(n_classes):
 
 # DINOv3 - ViT-Large 256 (SurgeNet2M)
 def load_dinov3_vitl_256_surgenet2m():
-    raise NotImplementedError(
-        "DINOv3 ViT-Large is not configured. Use 'lh-dinov3-vitb-256-surgenet2m' instead."
+    model = ViT(
+        img_size=(256, 256),
+        patch_size=16,
+        backbone_name="facebook/dinov3-vitl16-pretrain-lvd1689m",
     )
+    weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitl-256-surgenet2M.pth")
+    msg = _load_surgenet2m_weights(model, weight_path)
+    print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
+    return model
 
 def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
     vit = load_dinov3_vitl_256_surgenet2m()
