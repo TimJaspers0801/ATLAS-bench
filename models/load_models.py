@@ -104,49 +104,6 @@ def load_dinov2_l():
     print("\nLoaded DINOv2 ViT-l weights with msg:\n", msg)
     return model
 
-###########################################
-### Loading dinov3 (using transformers) ###
-###########################################
-
-# ViT-s
-def load_dinov3_s():
-    model = timm.create_model(
-        'vit_small_patch16_dinov3',
-        img_size=(336, 336),
-        patch_size=16,
-        num_classes=n_classes,
-    )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov3_vits'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv3 ViT-s weights with msg:\n", msg)
-    return model
-
-# ViT-b
-def load_dinov3_b():
-    model = timm.create_model(
-        'vit_base_patch16_dinov3',
-        img_size=(336, 336),
-        patch_size=16,
-        num_classes=n_classes,
-    )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov3_vitb'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv3 ViT-b weights with msg:\n", msg)
-    return model
-
-# ViT-l
-def load_dinov3_l():
-    model = timm.create_model(
-        'vit_large_patch16_dinov3',
-        img_size=(336, 336),
-        patch_size=16,
-        num_classes=n_classes,
-    )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov3_vitl'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv3 ViT-l weights with msg:\n", msg)
-    return model
-
 
 ###########################################
 ### vit with linear head ###
@@ -205,7 +162,15 @@ def load_surgenetxl_caformer_s18(num_classes=1):
 # These functions are kept for reference but will raise errors if called.
 
 def load_endofm(num_classes=1, device='cuda'):
-    raise RuntimeError("EndoFM model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
+    try:
+        # Import directly from TransUNet module to avoid path issues
+        from models.EndoFM.TransUNet.model import EndoFM as EndoFM_model
+        model = EndoFM_model(num_classes=num_classes, device=device)
+        print(f"Loaded EndoFM model with {num_classes} classes on {device}")
+        return model
+    except Exception as e:
+        print(f"Error loading EndoFM: {e}")
+        raise RuntimeError(f"EndoFM model failed to load: {e}. It may have unresolved dependencies.")
 
 def load_endovit(num_classes=1):
     raise RuntimeError("EndoViT model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
