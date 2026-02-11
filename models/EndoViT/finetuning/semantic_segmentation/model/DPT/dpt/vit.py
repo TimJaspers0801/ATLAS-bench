@@ -606,7 +606,7 @@ def _make_pretrained_endovit_vitb16_224(
     model = timm.create_model("vit_base_patch16_224", pretrained=False)
 
     if weights_path:
-        state_dict = torch.load(weights_path, map_location="cpu")
+        state_dict = torch.load(weights_path, map_location="cpu", weights_only=False)
         if isinstance(state_dict, dict) and "model" in state_dict:
             state_dict = state_dict["model"]
         model.load_state_dict(state_dict, strict=False)
