@@ -115,6 +115,11 @@ class ViTBackbone(nn.Module):
         if hasattr(backbone.patch_embed, 'grid_size'):
             # timm models have grid_size attribute
             self.grid_size = backbone.patch_embed.grid_size
+        elif hasattr(backbone.patch_embed, 'num_patches'):
+            # Fallback: calculate from num_patches
+            num_patches = backbone.patch_embed.num_patches
+            grid_size_val = int(num_patches ** 0.5)
+            self.grid_size = (grid_size_val, grid_size_val)
         else:
             # DINO models - calculate from image size and patch size
             if hasattr(backbone, 'img_size'):

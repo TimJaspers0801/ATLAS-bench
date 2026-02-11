@@ -100,32 +100,38 @@ def load_dinov1_b():
 ### Loading dinov2 (using timm) ###
 ###################################
 
-def load_dinov2_s():
+def load_dinov2_s(img_size=224):
+    if isinstance(img_size, int):
+        img_size = (img_size, img_size)
     model = timm.create_model(
         'vit_small_patch14_dinov2',
-        img_size=(224, 224),
+        img_size=img_size,
         patch_size=14,
-        num_classes=n_classes,
+        num_classes=0,
     )
     return model
 
 # ViT-b
-def load_dinov2_b():
+def load_dinov2_b(img_size=224):
+    if isinstance(img_size, int):
+        img_size = (img_size, img_size)
     model = timm.create_model(
         'vit_base_patch14_dinov2',
-        img_size=(224, 224),
+        img_size=img_size,
         patch_size=14,
-        num_classes=n_classes,
+        num_classes=0,
     )
     return model
 
 # ViT-l
-def load_dinov2_l():
+def load_dinov2_l(img_size=224):
+    if isinstance(img_size, int):
+        img_size = (img_size, img_size)
     model = timm.create_model(
         'vit_large_patch14_dinov2',
-        img_size=(224, 224),
+        img_size=img_size,
         patch_size=14,
-        num_classes=n_classes,
+        num_classes=0,
     )
     return model
 
