@@ -47,167 +47,88 @@ class ViT(nn.Module):
         self.register_buffer("pixel_std", pixel_std)
 
     def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
-        if hasattr(backbone, "vision_model"):
-            backbone = backbone.vision_model
-
-        embeddings = backbone.embeddings
-        backbone.patch_embed = embeddings
-        patch_size = embeddings.config.patch_size
-        backbone.patch_embed.patch_size = (patch_size, patch_size)
+        backbone.patch_embed = backbone.embeddings
+        backbone.patch_embed.patch_size = (
+            backbone.embeddings.config.patch_size,
+            backbone.embeddings.config.patch_size,
+        )
         backbone.patch_embed.grid_size = (
-            img_size[0] // patch_size,
-            img_size[1] // patch_size,
+            img_size[0] // backbone.embeddings.config.patch_size,
+            img_size[1] // backbone.embeddings.config.patch_size,
         )
 
-        backbone.embed_dim = embeddings.config.hidden_size
-        num_register_tokens = getattr(embeddings.config, "num_register_tokens", 0)
-        backbone.num_prefix_tokens = num_register_tokens + 1
+        backbone.embed_dim = backbone.embeddings.config.hidden_size
+        backbone.num_prefix_tokens = backbone.patch_embed.config.num_register_tokens + 1
+        backbone.blocks = backbone.layer
 
-        if hasattr(backbone, "encoder") and hasattr(backbone.encoder, "layer"):
-            backbone.blocks = backbone.encoder.layer
-        else:
-            backbone.blocks = backbone.layer
-
-        if hasattr(backbone.patch_embed, "mask_token"):
-            del backbone.patch_embed.mask_token
-        if hasattr(backbone, "embeddings"):
-            del backbone.embeddings
-        if hasattr(backbone, "encoder"):
-            del backbone.encoder
-        elif hasattr(backbone, "layer"):
-            del backbone.layer
+        del (
+            backbone.patch_embed.mask_token,
+            backbone.embeddings,
+            backbone.layer,
+        )
 
         return backbone
 
 
 class ViTBackbone(nn.Module):
+    """
+    Simplified ViT backbone wrapper that uses timm's built-in methods.
+    For timm models, uses forward_features() which handles everything correctly.
+    For native DINOv3, uses custom forward pass.
+    """
     def __init__(self, vit_model):
         super().__init__()
-        self.vit = vit_model
         
-        # Handle both timm-wrapped models and DINO models
+        # Determine model type
         if hasattr(vit_model, 'backbone'):
-            # timm-wrapped ViT model
-            backbone = vit_model.backbone
-            self.is_dino = False
-            self.is_hf_converted = False
+            # ViT class wrapper (from models/decoders/vit.py ViT class)
+            self.backbone = vit_model.backbone
+            self.is_vit_wrapper = True
         else:
-            # DINO model (direct DinoVisionTransformer)
-            backbone = vit_model
-            self.is_dino = True
-            # Check if this is an HF model converted to timm format
-            # HF converted models will have patch_embed.proj (HF style) not patch_embed.weight (timm style)
-            self.is_hf_converted = hasattr(backbone.patch_embed, 'proj')
+            # Direct model (timm or native DINOv3)
+            self.backbone = vit_model
+            self.is_vit_wrapper = False
         
-        # Get patch size - handle both cases
-        if hasattr(backbone.patch_embed, 'patch_size'):
-            patch_size = backbone.patch_embed.patch_size
-            if isinstance(patch_size, tuple):
-                self.patch_size = patch_size[0]
-            else:
-                self.patch_size = patch_size
+        # Check if this is native DINOv3 (has prepare_tokens_with_masks)
+        self.is_native_dinov3 = hasattr(self.backbone, 'prepare_tokens_with_masks')
+        
+        # Get model properties
+        if hasattr(self.backbone.patch_embed, 'patch_size'):
+            patch_size = self.backbone.patch_embed.patch_size
+            self.patch_size = patch_size[0] if isinstance(patch_size, tuple) else patch_size
         else:
-            self.patch_size = backbone.patch_embed.patch_size[0]
+            self.patch_size = 16  # default
             
-        self.embed_dim = backbone.embed_dim
-        
-        # Get grid_size - handle both timm and DINO models
-        if hasattr(backbone.patch_embed, 'grid_size'):
-            # timm models have grid_size attribute
-            self.grid_size = backbone.patch_embed.grid_size
-        elif hasattr(backbone.patch_embed, 'num_patches'):
-            # Fallback: calculate from num_patches
-            num_patches = backbone.patch_embed.num_patches
-            grid_size_val = int(num_patches ** 0.5)
-            self.grid_size = (grid_size_val, grid_size_val)
-        else:
-            # DINO models - calculate from image size and patch size
-            if hasattr(backbone, 'img_size'):
-                img_size = backbone.img_size
-                if isinstance(img_size, int):
-                    grid_size_val = img_size // self.patch_size
-                else:
-                    grid_size_val = img_size[0] // self.patch_size
-                self.grid_size = (grid_size_val, grid_size_val)
-            else:
-                # Fallback: calculate from positional embeddings
-                num_patches = backbone.pos_embed.shape[1] - getattr(backbone, 'num_prefix_tokens', 1)
-                grid_size_val = int(num_patches ** 0.5)
-                self.grid_size = (grid_size_val, grid_size_val)
-        
-        # Store number of prefix tokens for later use
-        self.num_prefix_tokens = getattr(backbone, 'num_prefix_tokens', 1)
-        
-        self.backbone_ref = backbone
+        self.embed_dim = self.backbone.embed_dim
 
     def forward(self, x):
-        backbone = self.backbone_ref
-        
-        # Handle DINO models (which have prepare_tokens_with_masks method)
-        if hasattr(backbone, 'prepare_tokens_with_masks'):
-            # DINO model forward pass
-            x = backbone.prepare_tokens_with_masks(x)
-            for blk in backbone.blocks:
-                x = blk(x)
-            x = backbone.norm(x)
-        # Handle HF-to-timm converted models (DINOv3)
-        elif self.is_hf_converted:
-            # HF models handle embeddings internally when accessed as attributes
-            x = backbone.patch_embed(x)
-            # HF models don't need separate _pos_embed() call - it's handled in forward
-            if hasattr(backbone.patch_embed, 'norm'):
-                x = backbone.patch_embed.norm(x)
-            for blk in backbone.blocks:
-                x = blk(x)
-            x = backbone.norm(x)
+        """Extract spatial features from ViT backbone."""
+        if self.is_native_dinov3:
+            # Native DINOv3: Use custom forward pass
+            features = self.backbone(x)
+            # Native DINOv3 returns (B, N, C) with prefix tokens already removed
+            B, N, C = features.shape
+            H = W = int(N ** 0.5)
+            features = features.transpose(1, 2).reshape(B, C, H, W)
+            return features
         else:
-            # timm ViT model forward pass
-            x = backbone.patch_embed(x)
-            if hasattr(backbone, '_pos_embed'):
-                x = backbone._pos_embed(x)
-            if hasattr(backbone, 'patch_drop'):
-                x = backbone.patch_drop(x)
-            if hasattr(backbone, 'norm_pre'):
-                x = backbone.norm_pre(x)
-            for blk in backbone.blocks:
-                x = blk(x)
-            x = backbone.norm(x)
-
-        # --- remove prefix tokens (CLS + register tokens) ---
-        B_before, N_before, C = x.shape
-        H, W = self.grid_size
-        expected_tokens = H * W
-        
-        # Check if tokens already match expected spatial tokens (no prefix removal needed)
-        if N_before == expected_tokens:
-            # Tokens already match, no prefix removal needed
-            num_prefix = 0
-        else:
-            # Use the stored value from initialization
-            num_prefix = self.num_prefix_tokens
+            # timm ViT: Use forward_features which handles everything
+            features = self.backbone.forward_features(x)
             
-        if num_prefix > 0:
-            x = x[:, num_prefix:, :]
-
-        B, N, C = x.shape
-        
-        # Verify we have the expected number of spatial tokens
-        if N != expected_tokens:
-            # Calculate actual grid size from available tokens
-            actual_grid_size = int(N ** 0.5)
-            if actual_grid_size * actual_grid_size == N:
-                H, W = actual_grid_size, actual_grid_size
-                print(f"Warning: grid_size mismatch. Expected {self.grid_size}, using computed ({H}, {W}) from {N} tokens")
-            else:
-                raise ValueError(
-                    f"Token count mismatch: got {N} tokens after removing {num_prefix} prefix tokens, "
-                    f"expected {expected_tokens} (grid_size={self.grid_size}). "
-                    f"Total tokens before removal: {B}×{N_before}×{C}"
-                )
-
-        # --- tokens → feature map ---
-        x = x.transpose(1, 2).reshape(B, C, H, W)
-        return x
+            # forward_features returns (B, N, C) where N includes prefix tokens
+            B, N, C = features.shape
+            
+            # Remove prefix tokens (CLS + register tokens)
+            num_prefix = getattr(self.backbone, 'num_prefix_tokens', 1)
+            if num_prefix > 0:
+                features = features[:, num_prefix:, :]
+            
+            # Reshape to spatial grid
+            B, N, C = features.shape
+            H = W = int(N ** 0.5)
+            features = features.transpose(1, 2).reshape(B, C, H, W)
+            
+            return features
 
 class ViTSegmenter(nn.Module):
     def __init__(
