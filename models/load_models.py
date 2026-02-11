@@ -162,15 +162,28 @@ def load_surgenetxl_caformer_s18(num_classes=1):
 # These functions are kept for reference but will raise errors if called.
 
 def load_endofm(num_classes=1, device='cuda'):
-    try:
-        # Import directly from TransUNet module to avoid path issues
-        from models.EndoFM.TransUNet.model import EndoFM as EndoFM_model
-        model = EndoFM_model(num_classes=num_classes, device=device)
-        print(f"Loaded EndoFM model with {num_classes} classes on {device}")
-        return model
-    except Exception as e:
-        print(f"Error loading EndoFM: {e}")
-        raise RuntimeError(f"EndoFM model failed to load: {e}. It may have unresolved dependencies.")
+    """
+    EndoFM model loader.
+    
+    Note: EndoFM has complex dependencies including ViT-seg and custom CONFIGS
+    that were designed for a specific system setup. Due to hardcoded paths and
+    circular dependencies in the TransUNet module, it's not currently available
+    in the container environment.
+    
+    To use EndoFM, either:
+    1. Remove hardcoded paths from models/EndoFM/TransUNet/model.py
+    2. Provide a compatible pretrained checkpoint for direct loading
+    3. Use alternative models: GastroNet5M, DINOv1/v2/v3, etc.
+    """
+    raise RuntimeError(
+        "EndoFM model is currently unavailable due to complex dependencies and hardcoded paths. "
+        "Please use alternative models:\n"
+        "  - lh-gastronet5m: GastroNet5M ViT-base linear head\n"
+        "  - lh-dinov1-vitb-224-surgenet2m: DINOv1 ViT-B at 224x224\n"
+        "  - lh-dinov2-vitb-336-surgenet2m: DINOv2 ViT-B at 336x336\n"
+        "  - lh-dinov3-vitb-256-surgenet2m: DINOv3 ViT-B at 256x256\n"
+        "See models/load_models.py for other available models."
+    )
 
 def load_endovit(num_classes=1):
     raise RuntimeError("EndoViT model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
