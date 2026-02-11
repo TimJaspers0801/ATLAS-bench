@@ -1,4 +1,5 @@
 import argparse
+import random
 import wandb
 import torch
 import os
@@ -11,12 +12,11 @@ from torch import nn
 from utils import load_checkpoint, bgr_palette
 import pandas as pd
 
-from models.load_models import load_eomt_s_dinov2, load_eomt_b_dinov2, load_eomt_l_dinov2,\
-                               load_eomt_s_dinov3, load_eomt_b_dinov3, load_eomt_l_dinov3, \
-                               load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2, load_surgenetxl_caformer_s18, \
-                               load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2
-
-from models.eomt.eomt import get_param_groups_llrd
+from models.load_models import load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2, load_surgenetxl_caformer_s18, \
+                               load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2, \
+                               load_endofm, load_endovit, load_lh_gastronet5m, \
+                               load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m, \
+                               load_lh_dinov3_vits_256_surgenet2m, load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
 from evaluation.dataset_evaluation import evaluate_model
 from evaluation.visual_logging import collect_visual_grids
 import numpy as np
@@ -24,14 +24,16 @@ import numpy as np
 
 def train(args):
     # set random seeds
-    torch.manual_seed(42)
-    torch.cuda.manual_seed(42)
-    is_eomt = False
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
 
     # Init wandb
     wandb.init(project="Atlas",
                config=vars(args),
                name=args.experiment_name,
+               group=args.wandb_group,
                dir="wandb")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -56,18 +58,21 @@ def train(args):
         transform=train_transform,
         first_frame_only=args.first_frame_only,
         frame_percentage=args.frame_percentage,
+        seed=args.seed,
     )
 
     val_dataset = AtlasDataset(
         zip_path=args.data_path,
         split="val",
         transform=val_transform,
+        seed=args.seed,
     )
 
     test_dataset = AtlasDataset(
         zip_path=args.data_path,
         split="test",
         transform=val_transform,
+        seed=args.seed,
     )
 
     train_loader = DataLoader(
@@ -100,33 +105,32 @@ def train(args):
     print(f"Training on {len(train_dataset)} samples, Validation on {len(val_dataset)} samples. Testing on {len(test_dataset)}.")
 
     # Model
-    if 'eomt' in args.model or 'vit' in args.model.lower():
+    if 'vit' in args.model.lower():
         base_lr = 1e-4
         weight_decay = 0.05
         llrd_factor = 0.8
-        if 'eomt' in args.model.lower():
-            is_eomt = True
-
-    if args.model == 'eomt-s-dinov2':
-        model = load_eomt_s_dinov2(n_classes=args.num_classes, num_q=100) # args.num_classes
-    elif args.model == 'eomt-b-dinov2':
-        model = load_eomt_b_dinov2(n_classes=args.num_classes, num_q=100)
-    elif args.model == 'eomt-l-dinov2':
-        model = load_eomt_l_dinov2(n_classes=args.num_classes, num_q=100)
-    elif args.model == 'eomt-s-dinov3':
-        model = load_eomt_s_dinov3(n_classes=args.num_classes, num_q=100)
-    elif args.model == 'eomt-b-dinov3':
-        model = load_eomt_b_dinov3(n_classes=args.num_classes, num_q=100)
-    elif args.model == 'eomt-l-dinov3':
-        model = load_eomt_l_dinov3(n_classes=args.num_classes, num_q=100)
 
     # simple linear head models
-    elif args.model == "lh-vit-s-dinov2":
+    if args.model == "lh-vit-s-dinov2":
         model = load_lh_vit_s_dinov2(n_classes=args.num_classes)
     elif args.model == "lh-vit-b-dinov2":
         model = load_lh_vit_b_dinov2(n_classes=args.num_classes)
     elif args.model == "lh-vit-l-dinov2":
         model = load_lh_vit_l_dinov2(n_classes=args.num_classes)
+    elif args.model == "lh-gastronet5m":
+        model = load_lh_gastronet5m(n_classes=args.num_classes)
+    
+    # SurgeNet2M-trained DINO models
+    elif args.model == "lh-dinov1-vitb-224-surgenet2m":
+        model = load_lh_dinov1_vitb_224_surgenet2m(n_classes=args.num_classes)
+    elif args.model == "lh-dinov2-vitb-336-surgenet2m":
+        model = load_lh_dinov2_vitb_336_surgenet2m(n_classes=args.num_classes)
+    elif args.model == "lh-dinov3-vits-256-surgenet2m":
+        model = load_lh_dinov3_vits_256_surgenet2m(n_classes=args.num_classes)
+    elif args.model == "lh-dinov3-vitb-256-surgenet2m":
+        model = load_lh_dinov3_vitb_256_surgenet2m(n_classes=args.num_classes)
+    elif args.model == "lh-dinov3-vitl-256-surgenet2m":
+        model = load_lh_dinov3_vitl_256_surgenet2m(n_classes=args.num_classes)
 
     elif args.model == 'convnextv2':
         model = load_surgenet_convnextv2_tiny(num_classes=args.num_classes)
@@ -136,6 +140,10 @@ def train(args):
         model = load_surgenet_pvtv2_b2(num_classes=args.num_classes)
     elif args.model == 'surgenetxl':
         model = load_surgenetxl_caformer_s18(num_classes=args.num_classes)
+    elif args.model == 'endofm':
+        model = load_endofm(num_classes=args.num_classes, device=device)
+    elif args.model == 'endovit':
+        model = load_endovit(num_classes=args.num_classes)
     else:
         print(f"Warning: Model {args.model} not recognized.")
 
@@ -144,20 +152,7 @@ def train(args):
 
     model.to(device)
 
-    if 'eomt' in args.model.lower():
-        from loss.eomt_loss import EoMTLoss
-        criterion = EoMTLoss(num_points=12544,
-                            oversample_ratio=3.0,
-                            importance_sample_ratio=0.75,
-                            mask_coefficient=5.0,
-                            dice_coefficient=5.0,
-                            class_coefficient=2.0,
-                            num_labels=args.num_classes,
-                            no_object_coefficient=1.0,
-                            ).to(device)
-        param_groups = get_param_groups_llrd(model, base_lr=base_lr, weight_decay=weight_decay,
-                                             llrd_layer_decay=llrd_factor)
-    elif 'vit' in args.model.lower():
+    if 'vit' in args.model.lower():
         from models.decoders.vit import get_param_groups_llrd_vit_segmenter
         param_groups = get_param_groups_llrd_vit_segmenter(
             model,
@@ -170,7 +165,7 @@ def train(args):
         criterion = nn.CrossEntropyLoss(ignore_index=255)
 
 
-    if 'eomt' in args.model.lower() or 'vit' in args.model.lower():
+    if 'vit' in args.model.lower():
         optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
     else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
@@ -211,37 +206,8 @@ def train(args):
 
             images, masks = images.to(device), masks.to(device).squeeze()
 
-            if 'eomt' in args.model.lower():
-                mask_logits_per_layer, class_logits_per_layer = model(images, return_semantic=False)
-                from loss.eomt_loss import convert_semantic_to_eomt_targets
-                seg_targets = convert_semantic_to_eomt_targets(masks, num_classes=args.num_classes)
-
-                ml = mask_logits_per_layer[-1]
-                print(
-                    "MASK LOGITS:",
-                    "raw min/max/mean =", ml.min().item(), ml.max().item(), ml.mean().item(),
-                    "| sigmoid min/max/mean =", ml.sigmoid().min().item(), ml.sigmoid().max().item(),
-                    ml.sigmoid().mean().item()
-                )
-
-                # accumulate scalar losses across layers
-                seg_loss = None
-
-                for i, (mask_logits, class_logits) in enumerate(zip(mask_logits_per_layer, class_logits_per_layer)):
-                    # slice logits to only those images that have masks
-                    # call EoMT/M2F loss to get dict of losses for this layer
-                    losses_dict = criterion(
-                        masks_queries_logits=mask_logits,
-                        class_queries_logits=class_logits,
-                        targets=seg_targets,
-                    )
-                    # reduce this layer's losses to a single scalar using the module helper
-                    layer_loss = criterion.loss_total(losses_dict)  # scalar tensor
-
-                    loss = layer_loss if seg_loss is None else seg_loss + layer_loss
-            else:
-                outputs = model(images)
-                loss = criterion(outputs, masks.long())
+            outputs = model(images)
+            loss = criterion(outputs, masks.long())
 
             optimizer.zero_grad()
             loss.backward()
@@ -267,8 +233,7 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes,
-            is_eomt=is_eomt
+            num_classes=args.num_classes
         )
 
         wandb.log({
@@ -337,16 +302,14 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes,
-            is_eomt=is_eomt
+            num_classes=args.num_classes
     )
     print("Evaluating on Test set...")
     test_metrics = evaluate_model(
             model=model,
             dataloader=test_loader,
             device=device,
-            num_classes=args.num_classes,
-            is_eomt=is_eomt
+            num_classes=args.num_classes
     )
     # Log final results
     wandb.log({
@@ -390,6 +353,8 @@ if __name__ == "__main__":
     parser.add_argument("--first_frame_only", action="store_true", help="Use only the first frame of each clip")
     parser.add_argument('--frame_percentage', type=int, default=100, help='Percentage of frames to use')
     parser.add_argument("--num_workers", type=int, default=16)
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--wandb_group", type=str, default=None)
     parser.add_argument(("--visualize"), action="store_true", help="Whether to log visualizations to wandb")
     args = parser.parse_args()
 

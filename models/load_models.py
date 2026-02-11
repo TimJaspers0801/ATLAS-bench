@@ -1,10 +1,16 @@
 import torch
 import timm
-from models.eomt import eomt, vit
+import os
 from models.surgenet import convnextv2
 from models.surgenet import pvtv2
 from models.surgenet import metaformer
 from models.decoders.vit import ViTSegmenter
+from models.EndoFM import EndoFM
+from models.EndoViT import EndoViT
+from models.GastroNet5M import vit_base_14
+from models.dinov1 import vision_transformer as dinov1_vit
+from models.dinov2 import vision_transformer as dinov2_vit
+from models.dinov3 import vision_transformer as dinov3_vit
 
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
@@ -25,8 +31,6 @@ urls = {
     'path_dinov3_vitb': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv3_ViTb16_size336_SurgeNetXL.pth?download=true',
     'path_dinov3_vitl': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv3_ViTl16_size336_SurgeNetXL.pth?download=true',
 }
-
-
 
 
 ###################################
@@ -63,48 +67,36 @@ def load_dinov1_b():
 ### Loading dinov2 (using timm) ###
 ###################################
 
-def remap_dinov2_weights(state_dict):
-    # --- Remap keys: add 'backbone.' to ViT layers ---
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        if k.startswith("blocks") or k.startswith("patch_embed") or k.startswith("cls_token") or k.startswith("pos_embed") or k.startswith("norm"):
-            new_state_dict["backbone." + k] = v
-        else:
-            # keep the rest (dino_head, etc.) as-is
-            new_state_dict[k] = v
-    return new_state_dict
 def load_dinov2_s():
     # ViT-s
-    model = vit.ViT(
-        backbone_name='vit_small_patch14_dinov2',
+    model = timm.create_model(
+        'vit_small_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vits'])
-    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-s weights with msg:\n", msg)
     return model
 
 # ViT-b
 def load_dinov2_b():
-    model = vit.ViT(
-        backbone_name='vit_base_patch14_dinov2',
+    model = timm.create_model(
+        'vit_base_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
     )
     state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitb'])
-    state_dict = remap_dinov2_weights(state_dict)
     msg = model.load_state_dict(state_dict, strict=False)
     print("\nLoaded DINOv2 ViT-b weights with msg:\n", msg)
     return model
 
 # ViT-l
 def load_dinov2_l():
-    model = vit.ViT(
-        backbone_name='vit_large_patch14_dinov2',
+    model = timm.create_model(
+        'vit_large_patch14_dinov2',
         img_size=(336, 336),
         patch_size=14,
         num_classes=n_classes,
@@ -188,35 +180,6 @@ def load_lh_vit_l_dinov2(n_classes):
 
 
 ###########################################
-### Loading eomt models ###
-###########################################
-
-def load_eomt_s_dinov2(n_classes, num_q=50):
-    model = eomt.eomt_vits_dinov2(num_classes=n_classes, num_q=num_q)
-    return model
-
-def load_eomt_b_dinov2(n_classes, num_q=50):
-    model = eomt.eomt_vitb_dinov2(num_classes=n_classes, num_q=num_q)
-    return model
-
-def load_eomt_l_dinov2(n_classes, num_q=50):
-    model = eomt.eomt_vitl_dinov2(num_classes=n_classes, num_q=num_q)
-    return model
-
-def load_eomt_s_dinov3(n_classes, num_q=50):
-    model = eomt.eomt_vits_dinov3(num_classes=n_classes, num_q=num_q)
-    return model
-
-def load_eomt_b_dinov3(n_classes, num_q=50):
-    model = eomt.eomt_vitb_dinov3(num_classes=n_classes, num_q=num_q)
-    return model
-
-def load_eomt_l_dinov3(n_classes, num_q=50):
-    model = eomt.eomt_vitl_dinov3(num_classes=n_classes, num_q=num_q)
-    return model
-
-
-###########################################
 ### surgenet models ###
 ###########################################
 
@@ -234,5 +197,128 @@ def load_surgenet_caformer_s18(num_classes=1):
 
 def load_surgenetxl_caformer_s18(num_classes=1):
     model = metaformer.caformer_s18_surgenetxl(num_classes=num_classes)
+    return model
+
+
+###########################################
+### EndoFM and EndoViT models ###
+###########################################
+
+def load_endofm(num_classes=1, device='cuda'):
+    model = EndoFM(num_classes=num_classes, device=device)
+    return model
+
+def load_endovit(num_classes=1):
+    model = EndoViT(num_classes=num_classes)
+    return model
+
+
+###########################################
+### GastroNet5M model ###
+###########################################
+
+def load_lh_gastronet5m(n_classes):
+    # Load GastroNet5M ViT base with patch size 14
+    vit = vit_base_14(patch_size=14, img_size=336, gastronet=True)
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+
+###########################################
+### SurgeNet2M-trained DINO models ###
+###########################################
+
+# DINOv1 - ViT-Base 224 (SurgeNet2M)
+def load_dinov1_vitb_224_surgenet2m():
+    model = dinov1_vit.vit_base(patch_size=16, num_classes=0, img_size=224)
+    weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv1-vitb-224-SurgNet2M.pth')
+    state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
+    print(f"\nLoaded DINOv1 ViT-Base 224 SurgeNet2M weights with msg:\n{msg}")
+    return model
+
+def load_lh_dinov1_vitb_224_surgenet2m(n_classes):
+    vit = load_dinov1_vitb_224_surgenet2m()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+# DINOv2 - ViT-Base 336 (SurgeNet2M)
+def load_dinov2_vitb_336_surgenet2m():
+    model = dinov2_vit.vit_base_14(patch_size=14, num_register_tokens=0)
+    weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv2-vitb-336-surgenet2M.pth')
+    state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
+    print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
+    return model
+
+def load_lh_dinov2_vitb_336_surgenet2m(n_classes):
+    vit = load_dinov2_vitb_336_surgenet2m()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+# DINOv3 - ViT-Large 256 (SurgeNet2M)
+def load_dinov3_vitl_256_surgenet2m():
+    model = dinov3_vit.vit_large(patch_size=16, img_size=256, num_classes=0)
+    weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv3-vitl-256-surgenet2M.pth')
+    state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
+    msg = model.load_state_dict(state_dict, strict=False)
+    print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
+    return model
+
+def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
+    vit = load_dinov3_vitl_256_surgenet2m()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+# DINOv3 - ViT-Small 256 (SurgeNet2M) - Placeholder for future weights
+def load_dinov3_vits_256_surgenet2m():
+    model = dinov3_vit.vit_small(patch_size=16, img_size=256, num_classes=0)
+    weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv3-vits-256-surgenet2M.pth')
+    if os.path.exists(weight_path):
+        state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
+        msg = model.load_state_dict(state_dict, strict=False)
+        print(f"\nLoaded DINOv3 ViT-Small 256 SurgeNet2M weights with msg:\n{msg}")
+    else:
+        print(f"\nWarning: Weight file not found at {weight_path}. Using uninitialized model.")
+    return model
+
+def load_lh_dinov3_vits_256_surgenet2m(n_classes):
+    vit = load_dinov3_vits_256_surgenet2m()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+# DINOv3 - ViT-Base 256 (SurgeNet2M) - Placeholder for future weights
+def load_dinov3_vitb_256_surgenet2m():
+    model = dinov3_vit.vit_base(patch_size=16, img_size=256, num_classes=0)
+    weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv3-vitb-256-surgenet2M.pth')
+    if os.path.exists(weight_path):
+        state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
+        msg = model.load_state_dict(state_dict, strict=False)
+        print(f"\nLoaded DINOv3 ViT-Base 256 SurgeNet2M weights with msg:\n{msg}")
+    else:
+        print(f"\nWarning: Weight file not found at {weight_path}. Using uninitialized model.")
+    return model
+
+def load_lh_dinov3_vitb_256_surgenet2m(n_classes):
+    vit = load_dinov3_vitb_256_surgenet2m()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
     return model
 

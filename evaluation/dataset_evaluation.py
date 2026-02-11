@@ -5,7 +5,7 @@ import numpy as np
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eomt=False):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
     model.eval()
 
     # Track scores per class across the entire dataset
@@ -23,16 +23,10 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, is_eom
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
 
-            if is_eomt:
-                outputs = model(images, return_semantic=True)
-                probs = torch.softmax(outputs, dim=1)
-                preds = torch.argmax(probs, dim=1, keepdim=True)
-                scores = probs.max(dim=1)[0].mean(dim=(1, 2))
-            else:
-                outputs = model(images)
-                probs = torch.softmax(outputs, dim=1)
-                preds = torch.argmax(probs, dim=1, keepdim=True)
-                scores = probs.max(dim=1)[0].mean(dim=(1, 2))
+            outputs = model(images)
+            probs = torch.softmax(outputs, dim=1)
+            preds = torch.argmax(probs, dim=1, keepdim=True)
+            scores = probs.max(dim=1)[0].mean(dim=(1, 2))
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
             for i in range(len(images)):

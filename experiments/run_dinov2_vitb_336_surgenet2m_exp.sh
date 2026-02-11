@@ -13,8 +13,6 @@ export WANDB_CACHE_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experimen
 export WANDB_START_METHOD="thread"
 wandb login
 
-
-
 # ===========================
 # Environment info
 # ===========================
@@ -45,22 +43,22 @@ cd ${PROJECT_ROOT} || exit 1
 
 DATA_ZIP=/data/atlas.zip
 OUTPUT_PATH=/outputs
-IMG_SIZE=256
+IMG_SIZE=336
 EPOCHS=10
-BATCH_SIZE=128
+BATCH_SIZE=64
 NUM_CLASSES=47
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 SEEDS=(0 1 2)
 
 # ===========================
-# Experiment — pvtv2 surgenet
+# Experiment — DINOv2 ViT-B 336 SurgeNet2M
 # ===========================
 
-WANDB_GROUP=pvtv2_atlas
+WANDB_GROUP=dinov2_vitb_336_surgenet2m_atlas
 
 for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=pvtv2_atlas_seed${SEED}
+  EXPERIMENT_NAME=lh_dinov2_vitb_336_surgenet2m_atlas_seed${SEED}
 
   echo "========================================"
   echo "Running ${EXPERIMENT_NAME}"
@@ -74,7 +72,7 @@ for SEED in "${SEEDS[@]}"; do
     python3 /workspace/train_frame_level.py \
       --data_path ${DATA_ZIP} \
       --experiment_name ${EXPERIMENT_NAME} \
-      --model pvtv2 \
+      --model lh-dinov2-vitb-336-surgenet2m \
       --num_classes ${NUM_CLASSES} \
       --epochs ${EPOCHS} \
       --batch_size ${BATCH_SIZE} \
@@ -85,74 +83,6 @@ for SEED in "${SEEDS[@]}"; do
       --wandb_group ${WANDB_GROUP} \
       --visualize
 done
-
-
-# ===========================
-# Experiment — convnext surgenet
-# ===========================
-
-WANDB_GROUP=convnextv2_atlas
-
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=convnextv2_atlas_seed${SEED}
-
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
-
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model convnextv2 \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --visualize
-done
-
-# ===========================
-# Experiment — caformer surgenet
-# ===========================
-
-WANDB_GROUP=caformer_atlas
-
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=caformer_atlas_seed${SEED}
-
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
-
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model caformer \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --visualize
-done
-
 
 echo "========================================"
 echo "Job finished"
