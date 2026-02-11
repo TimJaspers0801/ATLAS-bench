@@ -227,6 +227,23 @@ def load_dinov2_vitb_336_surgenet2m():
             for key, value in state_dict.items()
             if key.startswith("backbone.")
         }
+    if "pos_embed" in state_dict:
+        pos_embed = state_dict["pos_embed"]
+        if pos_embed.shape != model.pos_embed.shape:
+            num_prefix = getattr(model, "num_prefix_tokens", 1)
+            pos_prefix = pos_embed[:, :num_prefix]
+            pos_grid = pos_embed[:, num_prefix:]
+            grid_size_old = int(pos_grid.shape[1] ** 0.5)
+            grid_size_new = model.patch_embed.grid_size
+            pos_grid = pos_grid.reshape(1, grid_size_old, grid_size_old, -1).permute(0, 3, 1, 2)
+            pos_grid = torch.nn.functional.interpolate(
+                pos_grid,
+                size=grid_size_new,
+                mode="bicubic",
+                align_corners=False,
+            )
+            pos_grid = pos_grid.permute(0, 2, 3, 1).reshape(1, grid_size_new[0] * grid_size_new[1], -1)
+            state_dict["pos_embed"] = torch.cat([pos_prefix, pos_grid], dim=1)
     msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     return model
