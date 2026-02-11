@@ -198,8 +198,8 @@ def get_param_groups_llrd_vit_segmenter(
     - Early ViT layers get smaller LR
     """
 
-    # Get reference to the actual backbone (handles both timm and DINO models)
-    vit_backbone = model.backbone.backbone_ref
+    # Get reference to the actual backbone
+    vit_backbone = model.backbone.backbone
     num_blocks = len(vit_backbone.blocks)
 
     param_group_map = {}  # (layer_id, no_decay) -> params
