@@ -158,8 +158,7 @@ def load_surgenetxl_caformer_s18(num_classes=1):
 ###########################################
 ### EndoFM and EndoViT models ###
 ###########################################
-# Note: EndoFM and EndoViT have hardcoded paths that don't work in the container environment.
-# These functions are kept for reference but will raise errors if called.
+# EndoFM and EndoViT load from local sources and Hugging Face weights.
 
 def load_endofm(num_classes=1, device='cuda'):
     """Load EndoFM model for semantic segmentation."""

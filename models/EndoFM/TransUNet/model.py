@@ -17,20 +17,21 @@ from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 
 
 class VisionTransformerWithResize(nn.Module):
-    def __init__(self, original_model):
+    def __init__(self, original_model, model_input_size=224):
         super(VisionTransformerWithResize, self).__init__()
         self.original_model = original_model
+        self.model_input_size = model_input_size
 
     def forward(self, x):
-        # Step 1: Resize the input from 256x256 to 224x224
-        x = F.interpolate(x, size=(224, 224), mode='bilinear', align_corners=False)
-        
-        # Step 2: Pass the resized input to the original model
+        output_size = x.shape[-2:]
+        x = F.interpolate(
+            x,
+            size=(self.model_input_size, self.model_input_size),
+            mode='bilinear',
+            align_corners=False,
+        )
         x = self.original_model(x)
-        
-        # Step 3: Resize the model's output back to 256x256
-        x = F.interpolate(x, size=(256, 256), mode='bilinear', align_corners=False)
-        
+        x = F.interpolate(x, size=output_size, mode='bilinear', align_corners=False)
         return x
 
 def EndoFM(num_classes=12, device='cuda:0'):
@@ -87,7 +88,7 @@ def EndoFM(num_classes=12, device='cuda:0'):
     
     net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes)
 
-    model = VisionTransformerWithResize(net).to(device)
+    model = VisionTransformerWithResize(net, model_input_size=224).to(device)
 
     return model
 

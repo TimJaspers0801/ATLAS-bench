@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     model = load_endovit()
 
-    random_input = torch.randn(16, 3, 256, 256)
+    random_input = torch.randn(16, 3, 224, 224)
     out = model(random_input)
 
     print(out.shape)
