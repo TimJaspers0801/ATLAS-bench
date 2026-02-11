@@ -135,6 +135,9 @@ class ViTBackbone(nn.Module):
                 grid_size_val = int(num_patches ** 0.5)
                 self.grid_size = (grid_size_val, grid_size_val)
         
+        # Store number of prefix tokens for later use
+        self.num_prefix_tokens = getattr(backbone, 'num_prefix_tokens', 1)
+        
         self.backbone_ref = backbone
 
     def forward(self, x):
@@ -170,17 +173,30 @@ class ViTBackbone(nn.Module):
                 x = blk(x)
             x = backbone.norm(x)
 
-        # --- remove CLS token ---
-        if hasattr(backbone, 'num_prefix_tokens'):
-            num_prefix = backbone.num_prefix_tokens
-        else:
-            num_prefix = 1  # default for timm models
+        # --- remove prefix tokens (CLS + register tokens) ---
+        # Use the stored value from initialization
+        num_prefix = self.num_prefix_tokens
             
         if num_prefix > 0:
-            x = x[:, num_prefix :, :]
+            x = x[:, num_prefix:, :]
 
         B, N, C = x.shape
         H, W = self.grid_size
+        
+        # Verify we have the expected number of spatial tokens
+        expected_tokens = H * W
+        if N != expected_tokens:
+            # Calculate actual grid size from available tokens
+            actual_grid_size = int(N ** 0.5)
+            if actual_grid_size * actual_grid_size == N:
+                H, W = actual_grid_size, actual_grid_size
+                print(f"Warning: grid_size mismatch. Expected {self.grid_size}, using computed ({H}, {W}) from {N} tokens")
+            else:
+                raise ValueError(
+                    f"Token count mismatch: got {N} tokens after removing {num_prefix} prefix tokens, "
+                    f"expected {expected_tokens} (grid_size={self.grid_size}). "
+                    f"Total tokens before removal: {B}×{N + num_prefix}×{C}"
+                )
 
         # --- tokens → feature map ---
         x = x.transpose(1, 2).reshape(B, C, H, W)
