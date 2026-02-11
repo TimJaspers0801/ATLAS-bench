@@ -221,6 +221,12 @@ def load_dinov2_vitb_336_surgenet2m():
     state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
     if isinstance(state_dict, dict) and "teacher" in state_dict:
         state_dict = state_dict["teacher"]
+    if isinstance(state_dict, dict):
+        state_dict = {
+            key[len("backbone.") :]: value
+            for key, value in state_dict.items()
+            if key.startswith("backbone.")
+        }
     msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     return model
