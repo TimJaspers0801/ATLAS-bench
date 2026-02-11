@@ -71,20 +71,6 @@ def _load_surgenet2m_weights(model, weight_path):
     msg = target.load_state_dict(state_dict, strict=False)
     return msg
 
-# URLs for pre-trained DINO weights
-urls = {
-    'path_dinov1_vits': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv1_ViTs16_size224_SurgeNetXL.pth?download=true',
-    'path_dinov1_vitb': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv1_ViTb16_size224_SurgeNetXL.pth?download=true',
-
-    'path_dinov2_vits': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv2_ViTs14_size336_SurgeNetXL.pth?download=true',
-    'path_dinov2_vitb': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv2_ViTb14_size336_SurgeNetXL.pth?download=true',
-    'path_dinov2_vitl': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv2_ViTl14_size336_SurgeNetXL.pth?download=true',
-
-    'path_dinov3_vits': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv3_ViTs16_size336_SurgeNetXL.pth?download=true',
-    'path_dinov3_vitb': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv3_ViTb16_size336_SurgeNetXL.pth?download=true',
-    'path_dinov3_vitl': 'https://huggingface.co/rlpddejong/SurgeNetXL_DINOv1-v3/resolve/main/DINOv3_ViTl16_size336_SurgeNetXL.pth?download=true',
-}
-
 
 ###################################
 ### Loading dinov1(using timm) ###
@@ -306,6 +292,22 @@ def load_dinov2_vitb_336_surgenet2m():
     )
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv2-vitb-336-surgenet2M.pth")
     state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    
+    # Unwrap checkpoint if it has wrapper keys
+    if isinstance(state_dict, dict):
+        if "teacher" in state_dict:
+            state_dict = state_dict["teacher"]
+        elif "model" in state_dict:
+            state_dict = state_dict["model"]
+        elif "state_dict" in state_dict:
+            state_dict = state_dict["state_dict"]
+    
+    # Strip common prefixes
+    if any(key.startswith("module.") for key in state_dict.keys()):
+        state_dict = {key[len("module."):]: value for key, value in state_dict.items()}
+    if any(key.startswith("backbone.") for key in state_dict.keys()):
+        state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
+    
     msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     return model
