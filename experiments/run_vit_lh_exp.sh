@@ -29,7 +29,6 @@ echo "========================================"
 # ===========================
 
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
-DATA_ROOT_HOST=${PROJECT_ROOT}/data
 OUTPUT_ROOT_HOST=${PROJECT_ROOT}/outputs
 CONTAINER=${PROJECT_ROOT}/atlas.sif
 

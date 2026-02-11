@@ -28,7 +28,6 @@ echo "========================================"
 # ===========================
 
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
-DATA_ROOT_HOST=${PROJECT_ROOT}/data
 OUTPUT_ROOT_HOST=${PROJECT_ROOT}/outputs
 CONTAINER=${PROJECT_ROOT}/atlas.sif
 
@@ -66,7 +65,6 @@ for SEED in "${SEEDS[@]}"; do
 
   srun apptainer exec --nv \
     --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
     --bind ${OUTPUT_ROOT_HOST}:/outputs \
     ${CONTAINER} \
     python3 /workspace/train_frame_level.py \
