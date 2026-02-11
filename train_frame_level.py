@@ -38,6 +38,15 @@ def train(args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # Set image size based on model if not explicitly provided
+    if args.img_size == 256:  # default value
+        if "336" in args.model or "gastronet" in args.model.lower():
+            args.img_size = 336
+        elif "224" in args.model:
+            args.img_size = 224
+        elif "256" in args.model:
+            args.img_size = 256
+        # else: keep default 256 for other models
 
     # Define transforms
     train_transform = T.Compose([
