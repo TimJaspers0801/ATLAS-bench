@@ -43,7 +43,8 @@ class DPT(BaseModel):
             "vitb_rn50_384": [0, 1, 8, 11],
             "vitb16_384": [2, 5, 8, 11],
             "vitl16_384": [5, 11, 17, 23],
-            "mae_vitb16_224": [2, 5, 8, 11]
+            "mae_vitb16_224": [2, 5, 8, 11],
+            "endovit_vitb16_224": [2, 5, 8, 11],
         }
 
         # Instantiate backbone and reassemble blocks
