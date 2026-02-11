@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import timm
 from models.surgenet import convnextv2
@@ -319,6 +320,7 @@ def load_lh_dinov2_vitb_336_surgenet2m(n_classes):
 
 # DINOv3 - ViT-Large 256 (SurgeNet2M)
 # Uses native DINOv3 architecture compatible with Meta-trained checkpoints
+# Maps timm checkpoint weights to native DINOv3 format
 def load_dinov3_vitl_256_surgenet2m():
     from models.dinov3_native import DINOv3ViT
     
@@ -348,18 +350,65 @@ def load_dinov3_vitl_256_surgenet2m():
         if any(key.startswith("backbone.") for key in state_dict.keys()):
             state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
         
-        msg = backbone.load_state_dict(state_dict, strict=False)
+        # Map timm weights to native DINOv3 format
+        mapped_state_dict = {}
+        for key, value in state_dict.items():
+            # Map attention layers: attn.qkv -> attention.q/k/v_proj
+            if ".attn.qkv.weight" in key:
+                # Split qkv weights into separate q, k, v
+                prefix = key.replace(".attn.qkv.weight", "")
+                qkv_weight = value
+                embed_dim = qkv_weight.shape[0] // 3
+                q_proj, k_proj, v_proj = torch.chunk(qkv_weight, 3, dim=0)
+                mapped_state_dict[f"{prefix}.attention.q_proj.weight"] = q_proj
+                mapped_state_dict[f"{prefix}.attention.k_proj.weight"] = k_proj
+                mapped_state_dict[f"{prefix}.attention.v_proj.weight"] = v_proj
+            elif ".attn.qkv.bias" in key:
+                prefix = key.replace(".attn.qkv.bias", "")
+                qkv_bias = value
+                embed_dim = qkv_bias.shape[0] // 3
+                q_bias, k_bias, v_bias = torch.chunk(qkv_bias, 3, dim=0)
+                mapped_state_dict[f"{prefix}.attention.q_proj.bias"] = q_bias
+                mapped_state_dict[f"{prefix}.attention.k_proj.bias"] = k_bias
+                mapped_state_dict[f"{prefix}.attention.v_proj.bias"] = v_bias
+            elif ".attn.proj.weight" in key:
+                mapped_state_dict[key.replace(".attn.proj.weight", ".attention.o_proj.weight")] = value
+            elif ".attn.proj.bias" in key:
+                mapped_state_dict[key.replace(".attn.proj.bias", ".attention.o_proj.bias")] = value
+            # Map layer scale: ls1.gamma -> layer_scale1.lambda1
+            elif ".ls1.gamma" in key:
+                mapped_state_dict[key.replace(".ls1.gamma", ".layer_scale1.lambda1")] = value
+            elif ".ls2.gamma" in key:
+                mapped_state_dict[key.replace(".ls2.gamma", ".layer_scale2.lambda1")] = value
+            # Map MLP: fc1/fc2 -> up_proj/down_proj
+            elif ".mlp.fc1.weight" in key:
+                mapped_state_dict[key.replace(".mlp.fc1.weight", ".mlp.up_proj.weight")] = value
+            elif ".mlp.fc1.bias" in key:
+                mapped_state_dict[key.replace(".mlp.fc1.bias", ".mlp.up_proj.bias")] = value
+            elif ".mlp.fc2.weight" in key:
+                mapped_state_dict[key.replace(".mlp.fc2.weight", ".mlp.down_proj.weight")] = value
+            elif ".mlp.fc2.bias" in key:
+                mapped_state_dict[key.replace(".mlp.fc2.bias", ".mlp.down_proj.bias")] = value
+            else:
+                mapped_state_dict[key] = value
+        
+        msg = backbone.load_state_dict(mapped_state_dict, strict=False)
         print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
     
-    # Wrap in ViT class for compatibility
-    model = ViT.__new__(ViT)
-    model.backbone = backbone
-    model.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
-    model.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
-    model.register_buffer("pixel_mean", model.pixel_mean)
-    model.register_buffer("pixel_std", model.pixel_std)
+    # Wrap in ViT-compatible wrapper
+    class ViTWrapper(nn.Module):
+        def __init__(self, backbone):
+            super().__init__()
+            self.backbone = backbone
+            self.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
+            self.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
+            self.register_buffer("pixel_mean", self.pixel_mean)
+            self.register_buffer("pixel_std", self.pixel_std)
+        
+        def forward(self, x):
+            return self.backbone(x)
     
-    return model
+    return ViTWrapper(backbone)
 
 def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
     vit = load_dinov3_vitl_256_surgenet2m()
@@ -371,6 +420,7 @@ def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
 
 # DINOv3 - ViT-Base 256 (SurgeNet2M)
 # Uses native DINOv3 architecture compatible with Meta-trained checkpoints
+# Maps timm checkpoint weights to native DINOv3 format
 def load_dinov3_vitb_256_surgenet2m():
     from models.dinov3_native import DINOv3ViT
     
@@ -400,18 +450,65 @@ def load_dinov3_vitb_256_surgenet2m():
         if any(key.startswith("backbone.") for key in state_dict.keys()):
             state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
         
-        msg = backbone.load_state_dict(state_dict, strict=False)
+        # Map timm weights to native DINOv3 format
+        mapped_state_dict = {}
+        for key, value in state_dict.items():
+            # Map attention layers: attn.qkv -> attention.q/k/v_proj
+            if ".attn.qkv.weight" in key:
+                # Split qkv weights into separate q, k, v
+                prefix = key.replace(".attn.qkv.weight", "")
+                qkv_weight = value
+                embed_dim = qkv_weight.shape[0] // 3
+                q_proj, k_proj, v_proj = torch.chunk(qkv_weight, 3, dim=0)
+                mapped_state_dict[f"{prefix}.attention.q_proj.weight"] = q_proj
+                mapped_state_dict[f"{prefix}.attention.k_proj.weight"] = k_proj
+                mapped_state_dict[f"{prefix}.attention.v_proj.weight"] = v_proj
+            elif ".attn.qkv.bias" in key:
+                prefix = key.replace(".attn.qkv.bias", "")
+                qkv_bias = value
+                embed_dim = qkv_bias.shape[0] // 3
+                q_bias, k_bias, v_bias = torch.chunk(qkv_bias, 3, dim=0)
+                mapped_state_dict[f"{prefix}.attention.q_proj.bias"] = q_bias
+                mapped_state_dict[f"{prefix}.attention.k_proj.bias"] = k_bias
+                mapped_state_dict[f"{prefix}.attention.v_proj.bias"] = v_bias
+            elif ".attn.proj.weight" in key:
+                mapped_state_dict[key.replace(".attn.proj.weight", ".attention.o_proj.weight")] = value
+            elif ".attn.proj.bias" in key:
+                mapped_state_dict[key.replace(".attn.proj.bias", ".attention.o_proj.bias")] = value
+            # Map layer scale: ls1.gamma -> layer_scale1.lambda1
+            elif ".ls1.gamma" in key:
+                mapped_state_dict[key.replace(".ls1.gamma", ".layer_scale1.lambda1")] = value
+            elif ".ls2.gamma" in key:
+                mapped_state_dict[key.replace(".ls2.gamma", ".layer_scale2.lambda1")] = value
+            # Map MLP: fc1/fc2 -> up_proj/down_proj
+            elif ".mlp.fc1.weight" in key:
+                mapped_state_dict[key.replace(".mlp.fc1.weight", ".mlp.up_proj.weight")] = value
+            elif ".mlp.fc1.bias" in key:
+                mapped_state_dict[key.replace(".mlp.fc1.bias", ".mlp.up_proj.bias")] = value
+            elif ".mlp.fc2.weight" in key:
+                mapped_state_dict[key.replace(".mlp.fc2.weight", ".mlp.down_proj.weight")] = value
+            elif ".mlp.fc2.bias" in key:
+                mapped_state_dict[key.replace(".mlp.fc2.bias", ".mlp.down_proj.bias")] = value
+            else:
+                mapped_state_dict[key] = value
+        
+        msg = backbone.load_state_dict(mapped_state_dict, strict=False)
         print(f"\nLoaded DINOv3 ViT-Base 256 SurgeNet2M weights with msg:\n{msg}")
     
-    # Wrap in ViT class for compatibility
-    model = ViT.__new__(ViT)
-    model.backbone = backbone
-    model.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
-    model.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
-    model.register_buffer("pixel_mean", model.pixel_mean)
-    model.register_buffer("pixel_std", model.pixel_std)
+    # Wrap in ViT-compatible wrapper
+    class ViTWrapper(nn.Module):
+        def __init__(self, backbone):
+            super().__init__()
+            self.backbone = backbone
+            self.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
+            self.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
+            self.register_buffer("pixel_mean", self.pixel_mean)
+            self.register_buffer("pixel_std", self.pixel_std)
+        
+        def forward(self, x):
+            return self.backbone(x)
     
-    return model
+    return ViTWrapper(backbone)
 
 def load_lh_dinov3_vitb_256_surgenet2m(n_classes):
     vit = load_dinov3_vitb_256_surgenet2m()
