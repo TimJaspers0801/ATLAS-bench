@@ -42,7 +42,7 @@ cd ${PROJECT_ROOT} || exit 1
 
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 OUTPUT_PATH=/outputs
-IMG_SIZE=336
+IMG_SIZE=224
 EPOCHS=1
 BATCH_SIZE=128
 NUM_CLASSES=47
@@ -61,7 +61,6 @@ echo "========================================"
 
 srun apptainer exec --nv \
   --bind ${PROJECT_ROOT}:/workspace \
-  --bind ${DATA_ROOT_HOST}:/data \
   --bind ${OUTPUT_ROOT_HOST}:/outputs \
   ${CONTAINER} \
   python3 /workspace/train_frame_level.py \
@@ -90,7 +89,6 @@ echo "========================================"
 
 srun apptainer exec --nv \
   --bind ${PROJECT_ROOT}:/workspace \
-  --bind ${DATA_ROOT_HOST}:/data \
   --bind ${OUTPUT_ROOT_HOST}:/outputs \
   ${CONTAINER} \
   python3 /workspace/train_frame_level.py \
@@ -118,7 +116,6 @@ echo "========================================"
 
 srun apptainer exec --nv \
   --bind ${PROJECT_ROOT}:/workspace \
-  --bind ${DATA_ROOT_HOST}:/data \
   --bind ${OUTPUT_ROOT_HOST}:/outputs \
   ${CONTAINER} \
   python3 /workspace/train_frame_level.py \
@@ -133,14 +130,61 @@ srun apptainer exec --nv \
     --num_workers ${NUM_WORKERS} \
     --visualize
 
+
 # ===========================
-# Experiment — LH DINOv3 - s
+# Experiment — LH DINOv3 - b
 # ===========================
-EXPERIMENT_NAME=lh_vits_dinov3_atlas
-BATCH_SIZE=128
 
+IMG_SIZE=256
+EXPERIMENT_NAME=lh_vitb_dinov3_atlas
+BATCH_SIZE=64
 
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
 
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model lh-vit-b-dinov3 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
+
+# ===========================
+# Experiment — LH DINOv3 - l
+# ===========================
+
+EXPERIMENT_NAME=lh_vitl_dinov3_atlas
+BATCH_SIZE=16
+
+echo "========================================"
+echo "Running ${EXPERIMENT_NAME}"
+echo "========================================"
+
+srun apptainer exec --nv \
+  --bind ${PROJECT_ROOT}:/workspace \
+  --bind ${OUTPUT_ROOT_HOST}:/outputs \
+  ${CONTAINER} \
+  python3 /workspace/train_frame_level.py \
+    --data_path ${DATA_ZIP} \
+    --experiment_name ${EXPERIMENT_NAME} \
+    --model lh-vit-l-dinov3 \
+    --num_classes ${NUM_CLASSES} \
+    --epochs ${EPOCHS} \
+    --batch_size ${BATCH_SIZE} \
+    --img_size ${IMG_SIZE} \
+    --output_dir ${OUTPUT_PATH} \
+    --num_workers ${NUM_WORKERS} \
+    --visualize
 
 echo "========================================"
 echo "Job finished"

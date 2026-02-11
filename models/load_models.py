@@ -97,9 +97,6 @@ def load_dinov1_s():
     patch_size=16,
     num_classes=n_classes,
     )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov1_vits'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv1 ViT-s weights with msg:\n", msg)
     return model
 
 # ViT-b
@@ -110,9 +107,6 @@ def load_dinov1_b():
         patch_size=16,
         num_classes=n_classes,
     )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov1_vitb'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv1 ViT-b weights with msg:\n", msg)
     return model
 
 ###################################
@@ -122,39 +116,30 @@ def load_dinov1_b():
 def load_dinov2_s():
     model = timm.create_model(
         'vit_small_patch14_dinov2',
-        img_size=(336, 336),
+        img_size=(224, 224),
         patch_size=14,
         num_classes=n_classes,
     )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vits'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv2 ViT-s weights with msg:\n", msg)
     return model
 
 # ViT-b
 def load_dinov2_b():
     model = timm.create_model(
         'vit_base_patch14_dinov2',
-        img_size=(336, 336),
+        img_size=(224, 224),
         patch_size=14,
         num_classes=n_classes,
     )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitb'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv2 ViT-b weights with msg:\n", msg)
     return model
 
 # ViT-l
 def load_dinov2_l():
     model = timm.create_model(
         'vit_large_patch14_dinov2',
-        img_size=(336, 336),
+        img_size=(224, 224),
         patch_size=14,
         num_classes=n_classes,
     )
-    state_dict = torch.hub.load_state_dict_from_url(urls['path_dinov2_vitl'])
-    msg = model.load_state_dict(state_dict, strict=False)
-    print("\nLoaded DINOv2 ViT-l weights with msg:\n", msg)
     return model
 
 
@@ -179,6 +164,44 @@ def load_lh_vit_b_dinov2(n_classes):
 
 def load_lh_vit_l_dinov2(n_classes):
     vit = load_dinov2_l()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+
+def load_dinov3_b():
+    model = ViT(
+        img_size=(256, 256),
+        patch_size=16,
+        backbone_name="facebook/dinov3-vitb16-pretrain-lvd1689m",
+    )
+    print("\nLoaded DINOv3 ViT-Base (Hugging Face) weights.")
+    return model
+
+
+def load_dinov3_l():
+    model = ViT(
+        img_size=(256, 256),
+        patch_size=16,
+        backbone_name="facebook/dinov3-vitl16-pretrain-lvd1689m",
+    )
+    print("\nLoaded DINOv3 ViT-Large (Hugging Face) weights.")
+    return model
+
+
+def load_lh_vit_b_dinov3(n_classes):
+    vit = load_dinov3_b()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+
+def load_lh_vit_l_dinov3(n_classes):
+    vit = load_dinov3_l()
     model = ViTSegmenter(
         vit_model=vit,
         decoder_name="linear",
