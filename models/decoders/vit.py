@@ -37,25 +37,48 @@ class ViTBackbone(nn.Module):
     def __init__(self, vit_model):
         super().__init__()
         self.vit = vit_model
-        self.patch_size = vit_model.backbone.patch_embed.patch_size
-        self.embed_dim = vit_model.backbone.embed_dim
-        self.grid_size = vit_model.backbone.patch_embed.grid_size
+        
+        # Handle both timm-wrapped models and DINO models
+        if hasattr(vit_model, 'backbone'):
+            # timm-wrapped ViT model
+            backbone = vit_model.backbone
+            self.is_dino = False
+        else:
+            # DINO model (direct DinoVisionTransformer)
+            backbone = vit_model
+            self.is_dino = True
+        
+        # Get patch size - handle both cases
+        if hasattr(backbone.patch_embed, 'patch_size'):
+            patch_size = backbone.patch_embed.patch_size
+            if isinstance(patch_size, tuple):
+                self.patch_size = patch_size[0]
+            else:
+                self.patch_size = patch_size
+        else:
+            self.patch_size = backbone.patch_embed.patch_size[0]
+            
+        self.embed_dim = backbone.embed_dim
+        self.grid_size = backbone.patch_embed.grid_size
+        self.backbone_ref = backbone
 
     def forward(self, x):
+        backbone = self.backbone_ref
+        
         # --- identical to ViT forward until tokens ---
-        x = self.vit.backbone.patch_embed(x)
-        x = self.vit.backbone._pos_embed(x)
-        x = self.vit.backbone.patch_drop(x)
-        x = self.vit.backbone.norm_pre(x)
+        x = backbone.patch_embed(x)
+        x = backbone._pos_embed(x)
+        x = backbone.patch_drop(x)
+        x = backbone.norm_pre(x)
 
-        for blk in self.vit.backbone.blocks:
+        for blk in backbone.blocks:
             x = blk(x)
 
-        x = self.vit.backbone.norm(x)
+        x = backbone.norm(x)
 
         # --- remove CLS token ---
-        if self.vit.backbone.num_prefix_tokens > 0:
-            x = x[:, self.vit.backbone.num_prefix_tokens :, :]
+        if backbone.num_prefix_tokens > 0:
+            x = x[:, backbone.num_prefix_tokens :, :]
 
         B, N, C = x.shape
         H, W = self.grid_size
@@ -76,7 +99,8 @@ class ViTSegmenter(nn.Module):
 
         self.backbone = ViTBackbone(vit_model)
 
-        patch = vit_model.backbone.patch_embed.patch_size[0]
+        # Use patch_size from backbone which handles both timm and DINO models
+        patch = self.backbone.patch_size
         upsample_factor = patch
 
         self.decoder = build_decoder(
@@ -131,7 +155,8 @@ def get_param_groups_llrd_vit_segmenter(
     - Early ViT layers get smaller LR
     """
 
-    vit_backbone = model.backbone.vit.backbone
+    # Get reference to the actual backbone (handles both timm and DINO models)
+    vit_backbone = model.backbone.backbone_ref
     num_blocks = len(vit_backbone.blocks)
 
     param_group_map = {}  # (layer_id, no_decay) -> params

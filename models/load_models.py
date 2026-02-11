@@ -217,7 +217,11 @@ def load_endovit(num_classes=1):
 
 def load_lh_gastronet5m(n_classes):
     # Load GastroNet5M ViT base with patch size 14
-    vit = vit_base_14(patch_size=14, img_size=336, gastronet=True)
+    # Uses the actual DINO vit_base_14 function which loads gastronet weights
+    vit = vit_base_14(patch_size=14, img_size=224, gastronet=True)
+    
+    # Wrap with ViTSegmenter for semantic segmentation
+    # ViTSegmenter now handles both timm and DINO models
     model = ViTSegmenter(
         vit_model=vit,
         decoder_name="linear",
