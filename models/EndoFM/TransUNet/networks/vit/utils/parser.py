@@ -61,6 +61,8 @@ def parse_args():
     #     parser.print_help()
 
     args, unknown = parser.parse_known_args()
+    if unknown:
+        args.opts = []
 
     return args
 
