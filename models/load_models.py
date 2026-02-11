@@ -237,7 +237,11 @@ def load_dinov2_vitb_336_surgenet2m():
             if hasattr(model.patch_embed, "grid_size"):
                 grid_size_new = model.patch_embed.grid_size
             else:
-                grid_size_new = (model.img_size // model.patch_embed.patch_size, ) * 2
+                patch_size = model.patch_embed.patch_size
+                if isinstance(patch_size, tuple):
+                    patch_size = patch_size[0]
+                grid_val = model.img_size // patch_size
+                grid_size_new = (grid_val, grid_val)
             pos_grid = pos_grid.reshape(1, grid_size_old, grid_size_old, -1).permute(0, 3, 1, 2)
             pos_grid = torch.nn.functional.interpolate(
                 pos_grid,
