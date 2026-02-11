@@ -7,7 +7,7 @@
 #SBATCH --time=12:00:00                         # Specify the maximum time the job can run
 
 
-export APPTAINER_TMPDIR=/gpfs/home1/tjaspers2/temp/
+export APPTAINER_TMPDIR=/gpfs/work5/0/tesr0602/Tim/temp/
 
 
 apptainer pull atlas.sif docker://tjmjaspers/atlas:v2
