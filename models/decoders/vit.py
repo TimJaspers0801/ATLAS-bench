@@ -174,17 +174,24 @@ class ViTBackbone(nn.Module):
             x = backbone.norm(x)
 
         # --- remove prefix tokens (CLS + register tokens) ---
-        # Use the stored value from initialization
-        num_prefix = self.num_prefix_tokens
+        B_before, N_before, C = x.shape
+        H, W = self.grid_size
+        expected_tokens = H * W
+        
+        # Check if tokens already match expected spatial tokens (no prefix removal needed)
+        if N_before == expected_tokens:
+            # Tokens already match, no prefix removal needed
+            num_prefix = 0
+        else:
+            # Use the stored value from initialization
+            num_prefix = self.num_prefix_tokens
             
         if num_prefix > 0:
             x = x[:, num_prefix:, :]
 
         B, N, C = x.shape
-        H, W = self.grid_size
         
         # Verify we have the expected number of spatial tokens
-        expected_tokens = H * W
         if N != expected_tokens:
             # Calculate actual grid size from available tokens
             actual_grid_size = int(N ** 0.5)
@@ -195,7 +202,7 @@ class ViTBackbone(nn.Module):
                 raise ValueError(
                     f"Token count mismatch: got {N} tokens after removing {num_prefix} prefix tokens, "
                     f"expected {expected_tokens} (grid_size={self.grid_size}). "
-                    f"Total tokens before removal: {B}×{N + num_prefix}×{C}"
+                    f"Total tokens before removal: {B}×{N_before}×{C}"
                 )
 
         # --- tokens → feature map ---
