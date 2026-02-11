@@ -257,7 +257,12 @@ class Encoder(nn.Module):
         backbone = build_vit_base_patch16_224()
 
         # Endo-FM
-        weight = '/home/20182054/code/tim_ssl_surgnet/SOTA_models/EndoFM/checkpoints/endo_fm.pth'
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..', '..'))
+        weight = os.path.join(repo_root, 'weights', 'endo_fm.pth')
+        if not os.path.isfile(weight):
+            raise FileNotFoundError(
+                f"EndoFM checkpoint not found at {weight}. Place endo_fm.pth in the weights folder."
+            )
         ckpt = torch.load(weight, map_location='cpu')
         if "teacher" in ckpt:
             ckpt = ckpt["teacher"]
