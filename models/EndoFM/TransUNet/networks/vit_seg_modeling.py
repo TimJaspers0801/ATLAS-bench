@@ -264,7 +264,7 @@ class Encoder(nn.Module):
             raise FileNotFoundError(
                 f"EndoFM checkpoint not found at {weight}. Place endo_fm.pth in the weights folder."
             )
-        ckpt = torch.load(weight, map_location='cpu')
+        ckpt = torch.load(weight, map_location='cpu', weights_only=False)
         if "teacher" in ckpt:
             ckpt = ckpt["teacher"]
         if "model_state" in ckpt:
