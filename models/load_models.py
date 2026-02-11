@@ -326,6 +326,7 @@ def load_dinov3_vitl_256_surgenet2m():
     )
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv3-vitl-256-surgenet2M.pth")
     state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    print(state_dict.keys())
     msg = model.load_state_dict(state_dict, strict=False)
     print(f"\nLoaded DINOv3 ViT-Large 256 SurgeNet2M weights with msg:\n{msg}")
     return model
