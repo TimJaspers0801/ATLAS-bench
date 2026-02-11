@@ -59,7 +59,26 @@ class ViTBackbone(nn.Module):
             self.patch_size = backbone.patch_embed.patch_size[0]
             
         self.embed_dim = backbone.embed_dim
-        self.grid_size = backbone.patch_embed.grid_size
+        
+        # Get grid_size - handle both timm and DINO models
+        if hasattr(backbone.patch_embed, 'grid_size'):
+            # timm models have grid_size attribute
+            self.grid_size = backbone.patch_embed.grid_size
+        else:
+            # DINO models - calculate from image size and patch size
+            if hasattr(backbone, 'img_size'):
+                img_size = backbone.img_size
+                if isinstance(img_size, int):
+                    grid_size_val = img_size // self.patch_size
+                else:
+                    grid_size_val = img_size[0] // self.patch_size
+                self.grid_size = (grid_size_val, grid_size_val)
+            else:
+                # Fallback: calculate from positional embeddings
+                num_patches = backbone.pos_embed.shape[1] - getattr(backbone, 'num_prefix_tokens', 1)
+                grid_size_val = int(num_patches ** 0.5)
+                self.grid_size = (grid_size_val, grid_size_val)
+        
         self.backbone_ref = backbone
 
     def forward(self, x):
