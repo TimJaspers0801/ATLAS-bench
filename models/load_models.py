@@ -400,10 +400,8 @@ def load_dinov3_vitl_256_surgenet2m():
         def __init__(self, backbone):
             super().__init__()
             self.backbone = backbone
-            self.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
-            self.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
-            self.register_buffer("pixel_mean", self.pixel_mean)
-            self.register_buffer("pixel_std", self.pixel_std)
+            self.register_buffer("pixel_mean", torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1))
+            self.register_buffer("pixel_std", torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1))
         
         def forward(self, x):
             return self.backbone(x)
@@ -500,10 +498,8 @@ def load_dinov3_vitb_256_surgenet2m():
         def __init__(self, backbone):
             super().__init__()
             self.backbone = backbone
-            self.pixel_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1)
-            self.pixel_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1)
-            self.register_buffer("pixel_mean", self.pixel_mean)
-            self.register_buffer("pixel_std", self.pixel_std)
+            self.register_buffer("pixel_mean", torch.tensor([0.485, 0.456, 0.406]).reshape(1, -1, 1, 1))
+            self.register_buffer("pixel_std", torch.tensor([0.229, 0.224, 0.225]).reshape(1, -1, 1, 1))
         
         def forward(self, x):
             return self.backbone(x)
