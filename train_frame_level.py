@@ -114,7 +114,7 @@ def train(args):
     print(f"Training on {len(train_dataset)} samples, Validation on {len(val_dataset)} samples. Testing on {len(test_dataset)}.")
 
     # Model
-    if 'vit' in args.model.lower():
+    if 'vit' in args.model.lower() and args.model != 'endovit':
         base_lr = 1e-4
         weight_decay = 0.05
         llrd_factor = 0.8
@@ -173,7 +173,7 @@ def train(args):
     model.to(device)
 
     # Setup optimizer and criterion based on model type
-    if 'vit' in args.model.lower():
+    if 'vit' in args.model.lower() and args.model != 'endovit':
         from models.decoders.vit import get_param_groups_llrd_vit_segmenter
         param_groups = get_param_groups_llrd_vit_segmenter(
             model,
