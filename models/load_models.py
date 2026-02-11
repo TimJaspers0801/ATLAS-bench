@@ -215,7 +215,8 @@ def load_lh_dinov1_vitb_224_surgenet2m(n_classes):
 
 # DINOv2 - ViT-Base 336 (SurgeNet2M)
 def load_dinov2_vitb_336_surgenet2m():
-    model = dinov2_vit.vit_base_14(patch_size=14, img_size=336, num_register_tokens=0)
+    model = dinov2_vit.vit_base_14(patch_size=14, num_register_tokens=0)
+    model.img_size = 336
     weight_path = os.path.join(os.getcwd(), 'weights', 'DINOv2-vitb-336-surgenet2M.pth')
     state_dict = torch.load(weight_path, map_location='cpu', weights_only=False)
     if isinstance(state_dict, dict) and "teacher" in state_dict:
