@@ -336,21 +336,7 @@ def load_lh_dinov3_vitl_256_surgenet2m(n_classes):
         num_classes=n_classes)
     return model
 
-# DINOv3 - ViT-Small 256 (SurgeNet2M) - Placeholder for future weights
-def load_dinov3_vits_256_surgenet2m():
-    raise NotImplementedError(
-        "DINOv3 ViT-Small is not configured. Use 'lh-dinov3-vitb-256-surgenet2m' instead."
-    )
-
-def load_lh_dinov3_vits_256_surgenet2m(n_classes):
-    vit = load_dinov3_vits_256_surgenet2m()
-    model = ViTSegmenter(
-        vit_model=vit,
-        decoder_name="linear",
-        num_classes=n_classes)
-    return model
-
-# DINOv3 - ViT-Base 256 (SurgeNet2M) - Placeholder for future weights
+# DINOv3 - ViT-Base 256 (SurgeNet2M)
 def load_dinov3_vitb_256_surgenet2m():
     model = ViT(
         img_size=(256, 256),

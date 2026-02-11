@@ -66,7 +66,6 @@ for SEED in "${SEEDS[@]}"; do
 
   srun apptainer exec --nv \
     --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
     --bind ${OUTPUT_ROOT_HOST}:/outputs \
     ${CONTAINER} \
     python3 /workspace/train_frame_level.py \
@@ -100,7 +99,6 @@ for SEED in "${SEEDS[@]}"; do
 
   srun apptainer exec --nv \
     --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
     --bind ${OUTPUT_ROOT_HOST}:/outputs \
     ${CONTAINER} \
     python3 /workspace/train_frame_level.py \
@@ -133,7 +131,6 @@ for SEED in "${SEEDS[@]}"; do
 
   srun apptainer exec --nv \
     --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${DATA_ROOT_HOST}:/data \
     --bind ${OUTPUT_ROOT_HOST}:/outputs \
     ${CONTAINER} \
     python3 /workspace/train_frame_level.py \

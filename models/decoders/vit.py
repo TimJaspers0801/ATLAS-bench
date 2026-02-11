@@ -90,10 +90,14 @@ class ViTBackbone(nn.Module):
             # timm-wrapped ViT model
             backbone = vit_model.backbone
             self.is_dino = False
+            self.is_hf_converted = False
         else:
             # DINO model (direct DinoVisionTransformer)
             backbone = vit_model
             self.is_dino = True
+            # Check if this is an HF model converted to timm format
+            # HF converted models will have patch_embed.proj (HF style) not patch_embed.weight (timm style)
+            self.is_hf_converted = hasattr(backbone.patch_embed, 'proj')
         
         # Get patch size - handle both cases
         if hasattr(backbone.patch_embed, 'patch_size'):
@@ -138,12 +142,25 @@ class ViTBackbone(nn.Module):
             for blk in backbone.blocks:
                 x = blk(x)
             x = backbone.norm(x)
+        # Handle HF-to-timm converted models (DINOv3)
+        elif self.is_hf_converted:
+            # HF models handle embeddings internally when accessed as attributes
+            x = backbone.patch_embed(x)
+            # HF models don't need separate _pos_embed() call - it's handled in forward
+            if hasattr(backbone.patch_embed, 'norm'):
+                x = backbone.patch_embed.norm(x)
+            for blk in backbone.blocks:
+                x = blk(x)
+            x = backbone.norm(x)
         else:
             # timm ViT model forward pass
             x = backbone.patch_embed(x)
-            x = backbone._pos_embed(x)
-            x = backbone.patch_drop(x)
-            x = backbone.norm_pre(x)
+            if hasattr(backbone, '_pos_embed'):
+                x = backbone._pos_embed(x)
+            if hasattr(backbone, 'patch_drop'):
+                x = backbone.patch_drop(x)
+            if hasattr(backbone, 'norm_pre'):
+                x = backbone.norm_pre(x)
             for blk in backbone.blocks:
                 x = blk(x)
             x = backbone.norm(x)
