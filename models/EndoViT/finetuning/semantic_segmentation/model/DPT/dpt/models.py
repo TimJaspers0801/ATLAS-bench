@@ -64,11 +64,13 @@ class DPT(BaseModel):
         self.param_groups = []
 
         if (isinstance(self.pretrained, dict)):
-            self.param_groups.extend(self.pretrained["param_groups"])
+            if "param_groups" in self.pretrained:
+                self.param_groups.extend(self.pretrained["param_groups"])
             self.pretrained = self.pretrained["model"]
 
         if (isinstance(self.scratch, dict)):
-            self.param_groups.extend(self.scratch["param_groups"])
+            if "param_groups" in self.scratch:
+                self.param_groups.extend(self.scratch["param_groups"])
             self.scratch = self.scratch["model"]
 
         self.scratch.refinenet1 = _make_fusion_block(features, use_bn)
