@@ -5,11 +5,11 @@ import types
 import math
 import torch.nn.functional as F
 
-# get the MAE model code
-import sys
-from pathlib import Path
-sys.path.append("./pretraining/mae")
-from prepare_mae_model_seg_version import prepare_mae_model
+# Optional MAE loader (not required for EndoViT backbone usage)
+try:
+    from prepare_mae_model_seg_version import prepare_mae_model
+except ImportError:
+    prepare_mae_model = None
 
 
 activations = {}
@@ -546,6 +546,11 @@ def _make_pretrained_vitl16_384(
 def _make_MAE_pretrained_vitb16_224(
     mae_hyperparams, use_readout="ignore", hooks=None, enable_attention_hooks=False
 ):
+    if prepare_mae_model is None:
+        raise ImportError(
+            "prepare_mae_model_seg_version is missing. Add it to the "
+            "EndoViT model path or avoid using the MAE backbone."
+        )
     # If an empty dictionary was passed, set up default hyperparameters.
     if (not mae_hyperparams):
         mae_hyperparams = {
