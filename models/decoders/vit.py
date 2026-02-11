@@ -168,18 +168,17 @@ def get_vit_layer_id_from_name(name: str, num_blocks: int):
     if name.startswith("decoder"):
         return num_blocks + 1  # decoder = highest LR
 
-    if "backbone.vit.backbone.blocks" in name:
-        # example: backbone.vit.backbone.blocks.11.attn.qkv.weight
+    # Match blocks in the backbone (handles both old and new structure)
+    if "backbone.backbone.blocks" in name or "backbone.vit.backbone.blocks" in name:
+        # example: backbone.backbone.blocks.11.attn.qkv.weight
         try:
             block_id = int(name.split("blocks.")[1].split(".")[0])
             return block_id + 1
         except Exception:
             pass
 
-    if "backbone.vit.backbone.patch_embed" in name:
-        return 0  # earliest layer
-
-    if "backbone.vit.backbone.pos_embed" in name:
+    # Match patch_embed or pos_embed (earliest layers)
+    if "patch_embed" in name or "pos_embed" in name:
         return 0
 
     return 0
