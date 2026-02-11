@@ -162,31 +162,16 @@ def load_surgenetxl_caformer_s18(num_classes=1):
 # These functions are kept for reference but will raise errors if called.
 
 def load_endofm(num_classes=1, device='cuda'):
-    """
-    EndoFM model loader.
-    
-    Note: EndoFM has complex dependencies including ViT-seg and custom CONFIGS
-    that were designed for a specific system setup. Due to hardcoded paths and
-    circular dependencies in the TransUNet module, it's not currently available
-    in the container environment.
-    
-    To use EndoFM, either:
-    1. Remove hardcoded paths from models/EndoFM/TransUNet/model.py
-    2. Provide a compatible pretrained checkpoint for direct loading
-    3. Use alternative models: GastroNet5M, DINOv1/v2/v3, etc.
-    """
-    raise RuntimeError(
-        "EndoFM model is currently unavailable due to complex dependencies and hardcoded paths. "
-        "Please use alternative models:\n"
-        "  - lh-gastronet5m: GastroNet5M ViT-base linear head\n"
-        "  - lh-dinov1-vitb-224-surgenet2m: DINOv1 ViT-B at 224x224\n"
-        "  - lh-dinov2-vitb-336-surgenet2m: DINOv2 ViT-B at 336x336\n"
-        "  - lh-dinov3-vitb-256-surgenet2m: DINOv3 ViT-B at 256x256\n"
-        "See models/load_models.py for other available models."
-    )
+    """Load EndoFM model for semantic segmentation."""
+    from models.EndoFM.TransUNet.model import EndoFM
+    model = EndoFM(num_classes=num_classes, device=device)
+    return model
 
 def load_endovit(num_classes=1):
-    raise RuntimeError("EndoViT model is not available. It has hardcoded paths that don't work in this environment. Please use other available models.")
+    """Load EndoViT model for semantic segmentation."""
+    from models.EndoViT.load_endovit import EndoViT
+    model = EndoViT(num_classes=num_classes)
+    return model
 
 
 ###########################################

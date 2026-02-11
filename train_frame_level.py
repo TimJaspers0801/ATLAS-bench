@@ -154,13 +154,25 @@ def train(args):
     elif args.model == 'endovit':
         model = load_endovit(num_classes=args.num_classes)
     else:
-        print(f"Warning: Model {args.model} not recognized.")
+        raise ValueError(
+            f"Model {args.model} not recognized. Available models:\n"
+            "  - convnextv2, caformer, pvtv2, surgenetxl\n"
+            "  - lh-vit-s-dinov2, lh-vit-b-dinov2, lh-vit-l-dinov2\n"
+            "  - lh-gastronet5m\n"
+            "  - lh-dinov1-vitb-224-surgenet2m\n"
+            "  - lh-dinov2-vitb-336-surgenet2m\n"
+            "  - lh-dinov3-vits-256-surgenet2m\n"
+            "  - lh-dinov3-vitb-256-surgenet2m\n"
+            "  - lh-dinov3-vitl-256-surgenet2m\n"
+            "  - endofm, endovit"
+        )
 
     if args.checkpoint:
         load_checkpoint(model, args.checkpoint)
 
     model.to(device)
 
+    # Setup optimizer and criterion based on model type
     if 'vit' in args.model.lower():
         from models.decoders.vit import get_param_groups_llrd_vit_segmenter
         param_groups = get_param_groups_llrd_vit_segmenter(
@@ -170,13 +182,13 @@ def train(args):
             llrd_layer_decay=llrd_factor,
         )
         criterion = nn.CrossEntropyLoss(ignore_index=255)
+        optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
+    elif args.model in ['endofm', 'endovit']:
+        # Standard optimization for EndoFM and EndoViT
+        criterion = nn.CrossEntropyLoss(ignore_index=255)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
     else:
         criterion = nn.CrossEntropyLoss(ignore_index=255)
-
-
-    if 'vit' in args.model.lower():
-        optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
-    else:
         optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     learning_rate_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
