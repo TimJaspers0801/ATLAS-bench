@@ -250,6 +250,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     
     # Debug logging
     debug_file = open('/tmp/videomt_debug.log', 'w')
+    print("[DEBUG] Opened debug log file: /tmp/videomt_debug.log")
     
     with torch.no_grad():
         current_video = None
@@ -277,13 +278,15 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 outputs_list.append(output)
                 
                 # Debug first few batches
-                debug_file.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
-                debug_file.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
-                debug_file.write(f"  pred_logits shape: {output['pred_logits'].shape}\n")
-                debug_file.write(f"  pred_masks shape: {output['pred_masks'].shape}\n")
-                debug_file.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
-                debug_file.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
-                debug_file.flush()
+                if debug_count < 3 and i == 0:
+                    debug_file.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
+                    debug_file.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
+                    debug_file.write(f"  pred_logits shape: {output['pred_logits'].shape}\n")
+                    debug_file.write(f"  pred_masks shape: {output['pred_masks'].shape}\n")
+                    debug_file.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
+                    debug_file.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
+                    debug_file.flush()
+                    print(f"[DEBUG] Wrote debug info for batch {batch_idx}")
                     
             debug_count += 1
             
@@ -369,6 +372,11 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                     if iou_c is not None:
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
+            
+            # Early exit for debugging
+            if debug_count >= 3:
+                print(f"[DEBUG] Stopping after {debug_count} batches for debugging")
+                break
     
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
