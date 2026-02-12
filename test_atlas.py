@@ -128,68 +128,18 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
 
 def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     """Load VideoMT model for online video processing."""
-    from models.videomt.videomt_standalone import VideoMT
+    from models.videomt.videomt_standalone import build_videomt_model
     
-    # Initialize with training configuration - ATLAS was trained with:
-    model = VideoMT(
+    # Use build_videomt_model which handles checkpoint loading properly
+    model = build_videomt_model(
+        checkpoint_path=checkpoint_path,
         img_size=1280,
         num_classes=124,
         num_queries=200,
         task='vss',
         model_name='vit_large_patch14_dinov2.lvd142m',
+        device='cpu',  # We'll move to device after
     )
-    
-    if checkpoint_path and os.path.isfile(checkpoint_path):
-        print(f"Loading VideoMT checkpoint: {checkpoint_path}")
-        state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        
-        # Handle pos_embed shape mismatch due to patch_size differences
-        # Checkpoint has pos_embed [1, 6400, 1024] (80x80 patches with patch_size=14)
-        # Model might expect different size with patch_size=16
-        if 'encoder.backbone.pos_embed' in state_dict:
-            checkpoint_pos_embed = state_dict['encoder.backbone.pos_embed']
-            model_pos_embed = model.encoder.backbone.pos_embed
-            
-            if checkpoint_pos_embed.shape != model_pos_embed.shape:
-                print(f"⚠ Pos_embed shape mismatch:")
-                print(f"  Checkpoint: {checkpoint_pos_embed.shape}")
-                print(f"  Model:      {model_pos_embed.shape}")
-                
-                # Interpolate pos_embed to match model shape
-                if checkpoint_pos_embed.shape[1] != model_pos_embed.shape[1]:
-                    # Reshape to 2D and interpolate
-                    B, N, D = checkpoint_pos_embed.shape
-                    H_ckpt = W_ckpt = int(N ** 0.5)
-                    
-                    pos_embed_reshaped = checkpoint_pos_embed.reshape(B, H_ckpt, W_ckpt, D).permute(0, 3, 1, 2)
-                    
-                    B_model, N_model, D_model = model_pos_embed.shape
-                    H_model = W_model = int(N_model ** 0.5)
-                    
-                    pos_embed_interp = F.interpolate(
-                        pos_embed_reshaped,
-                        size=(H_model, W_model),
-                        mode='bilinear',
-                        align_corners=False
-                    ).permute(0, 2, 3, 1).reshape(B_model, N_model, D_model)
-                    
-                    state_dict['encoder.backbone.pos_embed'] = pos_embed_interp
-                    print(f"  Interpolated to: {pos_embed_interp.shape}")
-        
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        if not missing_keys and not unexpected_keys:
-            print("✓ All keys loaded successfully")
-        else:
-            if missing_keys:
-                print(f"⚠ Missing keys ({len(missing_keys)}):")
-                for key in missing_keys[:10]:  # Show first 10
-                    print(f"  - {key}")
-                if len(missing_keys) > 10:
-                    print(f"  ... and {len(missing_keys) - 10} more")
-            if unexpected_keys:
-                print(f"⚠ Unexpected keys ({len(unexpected_keys)}):")
-                for key in unexpected_keys:
-                    print(f"  - {key}")
     
     return model.to(device)
 
