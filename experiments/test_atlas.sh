@@ -130,7 +130,7 @@ for model_config in "${MODELS[@]}"; do
         --bind ${DATA_ZIP}:/data/atlas.zip \
         --pwd /workspace \
         ${CONTAINER} \
-        python test_atlas.py \
+        python3 test_atlas.py \
             --model ${MODEL_NAME} \
             ${CHECKPOINT_ARG} \
             --data_path /data/atlas.zip \
@@ -161,7 +161,7 @@ echo "========================================"
 echo ""
 echo "Generating summary report..."
 
-python << 'EOF'
+python3 << 'EOF'
 import json
 import os
 from pathlib import Path
