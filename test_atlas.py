@@ -132,8 +132,8 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     # Initialize with training configuration - ATLAS was trained with:
     model = VideoMT(
         img_size=256,
-        num_classes=num_classes,
-        num_queries=100,
+        num_classes=125,
+        num_queries=200,
         task='vss',
         model_name='vit_large_patch14_dinov2.lvd142m',
     )
