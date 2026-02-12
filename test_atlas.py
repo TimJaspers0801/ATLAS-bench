@@ -250,8 +250,11 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     with torch.no_grad():
         current_video = None
         debug_count = 0
+        frame_count = 0
         
-        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT", disable=debug_count<3)):
+        print(f"Starting evaluation on {len(test_loader)} frames...")
+        
+        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT")):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
             
@@ -260,6 +263,8 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             if batch_video != current_video:
                 model.reset_memory()
                 current_video = batch_video
+                if batch_idx % 500 == 0 or debug_count < 5:
+                    print(f"\n[Progress] Processing video: {batch_video}, Frame batch: {batch_idx}")
             
             # Process frames online
             B = images.shape[0]
@@ -294,15 +299,18 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             sem_mask = semseg.argmax(dim=1)  # (B, H, W) - predicted class index (0 to C-1)
             
             # Debug: Show aggregation info
-            if debug_count < 3:
-                print(f"\n[DEBUG VSS Aggregation - Batch {batch_idx}]")
-                print(f"  mask_cls shape: {mask_cls.shape}")
-                print(f"  pred_masks_prob shape: {pred_masks_prob.shape}")
-                print(f"  semseg shape: {semseg.shape}")
-                print(f"  sem_mask shape: {sem_mask.shape}")
-                print(f"  sem_mask range: [{sem_mask.min()}, {sem_mask.max()}]")
+            if debug_count < 5:
+                unique_preds = torch.unique(sem_mask[0])
+                unique_gt = torch.unique(gt_masks[0])
+                print(f"\n[Batch {batch_idx}] Pred classes: {unique_preds.tolist()}, GT classes: {unique_gt.tolist()}")
                 
             debug_count += 1
+            
+            # Report progress every 1000 frames
+            frame_count += B
+            if frame_count % 1000 == 0:
+                print(f"\n[Progress] Processed {frame_count}/{len(test_loader)} frames")
+                
             for i in range(B):
                 # Get GT mask and ensure 2D shape
                 gt_mask = gt_masks[i].squeeze()  # Remove any extra dimensions
@@ -320,11 +328,9 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                     ).squeeze().long()  # (H, W)
                 
                 # Debug info
-                if debug_count <= 3 and i == 0:
-                    print(f"\n[DEBUG Per-Frame Processing]")
-                    print(f"  Predicted seg shape: {pred_seg.shape}")
-                    print(f"  Predicted seg unique classes: {torch.unique(pred_seg)}")
-                    print(f"  GT mask unique classes: {torch.unique(gt_mask)}")
+                if debug_count <= 5 and i == 0:
+                    print(f"  → Pred shape: {pred_seg.shape}, unique: {torch.unique(pred_seg).tolist()}")
+                    print(f"  → GT shape: {gt_mask.shape}, unique: {torch.unique(gt_mask).tolist()}")
                 
                 # Convert to numpy for metrics computation
                 pred_np = pred_seg.cpu().numpy()
@@ -358,7 +364,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
     
-    print("\n[EVALUATION COMPLETE]")
+    print(f"\n✓ Evaluation complete! Processed {frame_count} frames total")
     
     # Aggregate metrics
     from evaluation.metrics import compute_class_metrics

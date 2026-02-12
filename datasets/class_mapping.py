@@ -81,6 +81,7 @@ mapping = {
     43: 0,  # Mesocolon => Background
     44: 0,  # Adrenal Gland => Background
     45: 0,  # Pancreas => Background
+    46: 0,  # Duodenum => Background
 }
 
 def remap_mask(mask: np.ndarray, mapping: dict, default_value=0) -> np.ndarray:
@@ -111,8 +112,8 @@ def remap_mask(mask: np.ndarray, mapping: dict, default_value=0) -> np.ndarray:
 
     mask = mask.astype(np.int32)
 
-    # LUT size based on maximum possible label
-    max_label = max(mapping.keys())  # safer than mask.max()
+    # LUT size based on maximum possible label (consider both mapping keys and actual mask values)
+    max_label = max(mask.max(), max(mapping.keys()))
 
     # Fill LUT with default value
     lut = np.full(max_label + 1, default_value, dtype=np.int32)
