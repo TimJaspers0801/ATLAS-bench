@@ -34,7 +34,7 @@ class ViT(nn.Module):
             patch_size=patch_size,
             num_classes=0,
             dynamic_img_size=True,
-            class_token=False,  # Disable class token to match training checkpoint
+            num_prefix_tokens=0,  # No class token or other prefix tokens to match training
         )
         self.backbone.patch_embed.strict_img_size = False
         self.backbone.patch_embed.dynamic_img_pad = False
