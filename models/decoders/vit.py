@@ -47,9 +47,7 @@ class ViT(nn.Module):
         self.register_buffer("pixel_std", pixel_std)
 
     def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
-        # Store the original model for forward pass
-        self._hf_model = backbone
-        
+        # Add timm-style attributes (keep originals for HF forward)
         backbone.patch_embed = backbone.embeddings
         backbone.patch_embed.patch_size = (
             backbone.embeddings.config.patch_size,
@@ -64,13 +62,11 @@ class ViT(nn.Module):
         backbone.num_prefix_tokens = backbone.embeddings.config.num_register_tokens + 1
         backbone.blocks = backbone.layer
 
-        del (
-            backbone.patch_embed.mask_token,
-            backbone.embeddings,
-            backbone.layer,
-        )
+        # Only delete mask_token (not embeddings/layer, needed for HF forward)
+        if hasattr(backbone.patch_embed, 'mask_token'):
+            del backbone.patch_embed.mask_token
 
-        return backbone
+        return backbone        return backbone
 
 
 class ViTBackbone(nn.Module):
@@ -87,17 +83,15 @@ class ViTBackbone(nn.Module):
             # ViT class wrapper (from models/decoders/vit.py ViT class)
             self.backbone = vit_model.backbone
             self.is_vit_wrapper = True
-            # Check if the ViT wrapper stored the original HF model
-            self.hf_model = getattr(vit_model, '_hf_model', None)
         else:
             # Direct model (timm or native DINOv3)
             self.backbone = vit_model
             self.is_vit_wrapper = False
-            self.hf_model = None
         
         # Check model type
         self.is_native_dinov3 = hasattr(self.backbone, 'prepare_tokens_with_masks')
-        self.is_hf_model = self.hf_model is not None
+        # HF model detection: has both embeddings and layer (transformers model)
+        self.is_hf_model = hasattr(self.backbone, 'embeddings') and hasattr(self.backbone, 'layer')
         
         # Get model properties
         if hasattr(self.backbone.patch_embed, 'patch_size'):
@@ -119,8 +113,8 @@ class ViTBackbone(nn.Module):
             features = features.transpose(1, 2).reshape(B, C, H, W)
             return features
         elif self.is_hf_model:
-            # HuggingFace model: Use the original model's forward method
-            outputs = self.hf_model(x)
+            # HuggingFace model: Use the backbone's forward method with pixel_values argument
+            outputs = self.backbone(pixel_values=x)
             features = outputs.last_hidden_state  # (B, N, C) with prefix tokens
             
             # Remove prefix tokens (CLS + register tokens)

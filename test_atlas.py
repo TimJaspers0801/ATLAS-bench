@@ -32,10 +32,10 @@ import torch.nn.functional as F
 
 from utils import load_checkpoint
 from models.load_models import (
+    load_lh_vit_s_dinov1, load_lh_vit_b_dinov1, 
     load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2,
-    load_lh_vit_b_dinov3, load_lh_vit_l_dinov3,
+    load_lh_vit_s_dinov3, load_lh_vit_b_dinov3, load_lh_vit_l_dinov3,
     load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2,
-    load_surgenetxl_caformer_s18,
     load_endofm, load_endovit, load_lh_gastronet5m,
     load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m,
     load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
@@ -46,12 +46,17 @@ import numpy as np
 
 # Model registry
 MODEL_REGISTRY = {
+    # DINOv1 variants
+    "lh-vit-s-dinov1": load_lh_vit_s_dinov1,
+    "lh-vit-b-dinov1": load_lh_vit_b_dinov1,
+
     # DINOv2 variants
     "lh-vit-s-dinov2": load_lh_vit_s_dinov2,
     "lh-vit-b-dinov2": load_lh_vit_b_dinov2,
     "lh-vit-l-dinov2": load_lh_vit_l_dinov2,
     
     # DINOv3 variants
+    "lh-vit-s-dinov3": load_lh_vit_s_dinov3,
     "lh-vit-b-dinov3": load_lh_vit_b_dinov3,
     "lh-vit-l-dinov3": load_lh_vit_l_dinov3,
     
@@ -69,7 +74,6 @@ MODEL_REGISTRY = {
     "surgenet-caformer-s18": load_surgenet_caformer_s18,
     "surgenet-convnextv2-tiny": load_surgenet_convnextv2_tiny,
     "surgenet-pvtv2-b2": load_surgenet_pvtv2_b2,
-    "surgenetxl-caformer-s18": load_surgenetxl_caformer_s18,
     
     # Other vision models
     "endofm": load_endofm,
