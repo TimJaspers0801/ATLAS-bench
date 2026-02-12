@@ -13,8 +13,9 @@ from utils import load_checkpoint, bgr_palette
 import pandas as pd
 
 from models.load_models import load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2, load_surgenetxl_caformer_s18, \
+                               load_lh_vit_s_dinov1, load_lh_vit_b_dinov1, \
                                load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2, \
-                               load_lh_vit_b_dinov3, load_lh_vit_l_dinov3, \
+                               load_lh_vit_s_dinov3, load_lh_vit_b_dinov3, load_lh_vit_l_dinov3, \
                                load_endofm, load_endovit, load_lh_gastronet5m, \
                                load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m, \
                                load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
@@ -121,12 +122,18 @@ def train(args):
         llrd_factor = 0.8
 
     # simple linear head models
+    if args.model == "lh-vit-s-dinov1":
+        model = load_lh_vit_s_dinov1(n_classes=args.num_classes)
+    elif args.model == "lh-vit-b-dinov1":
+        model = load_lh_vit_b_dinov1(n_classes=args.num_classes)
     if args.model == "lh-vit-s-dinov2":
         model = load_lh_vit_s_dinov2(n_classes=args.num_classes)
     elif args.model == "lh-vit-b-dinov2":
         model = load_lh_vit_b_dinov2(n_classes=args.num_classes)
     elif args.model == "lh-vit-l-dinov2":
         model = load_lh_vit_l_dinov2(n_classes=args.num_classes)
+    elif args.model == "lh-vit-s-dinov3":
+        model = load_lh_vit_s_dinov3(n_classes=args.num_classes)
     elif args.model == "lh-vit-b-dinov3":
         model = load_lh_vit_b_dinov3(n_classes=args.num_classes)
     elif args.model == "lh-vit-l-dinov3":

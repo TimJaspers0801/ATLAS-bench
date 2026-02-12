@@ -139,6 +139,22 @@ def load_dinov2_l(img_size=224):
 ###########################################
 ### vit with linear head ###
 ###########################################
+def load_lh_vit_s_dinov1(n_classes):
+    vit = load_dinov1_s()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
+def load_lh_vit_b_dinov1(n_classes):
+    vit = load_dinov1_b()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
 def load_lh_vit_s_dinov2(n_classes):
     vit = load_dinov2_s()
     model = ViTSegmenter(
