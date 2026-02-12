@@ -23,6 +23,7 @@ import os
 import json
 from tqdm import tqdm
 from collections import defaultdict
+import cv2
 
 from torch.utils.data import DataLoader
 from datasets.atlas import AtlasDataset
@@ -30,7 +31,7 @@ import torchvision.transforms.v2 as T
 from torch import nn
 import torch.nn.functional as F
 
-from utils import load_checkpoint
+from utils import load_checkpoint, color_palette
 from models.load_models import (
     load_lh_vit_s_dinov1, load_lh_vit_b_dinov1, 
     load_lh_vit_s_dinov2, load_lh_vit_b_dinov2, load_lh_vit_l_dinov2,
@@ -41,6 +42,7 @@ from models.load_models import (
     load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
 )
 from evaluation.dataset_evaluation import evaluate_model
+from evaluation.visual_logging import apply_mask_overlay, denormalize
 import numpy as np
 
 
@@ -249,11 +251,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     
     with torch.no_grad():
         current_video = None
-        debug_count = 0
-        frame_count = 0
-        
-        print(f"Starting evaluation on {len(test_loader)} frames...")
-        
+
         for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT")):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
@@ -263,9 +261,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             if batch_video != current_video:
                 model.reset_memory()
                 current_video = batch_video
-                if batch_idx % 500 == 0 or debug_count < 5:
-                    print(f"\n[Progress] Processing video: {batch_video}, Frame batch: {batch_idx}")
-            
+
             # Process frames online
             B = images.shape[0]
             outputs_list = []
@@ -277,7 +273,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 output = model.forward_frame(frame)
                 outputs_list.append(output)
                     
-            debug_count += 1
             
             # Combine outputs from batch
             pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)  # (B, Q, C+1)
@@ -298,19 +293,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             # Take argmax over classes (dimension 1) to get predicted class for each pixel
             sem_mask = semseg.argmax(dim=1)  # (B, H, W) - predicted class index (0 to C-1)
             
-            # Debug: Show aggregation info
-            if debug_count < 5:
-                unique_preds = torch.unique(sem_mask[0])
-                unique_gt = torch.unique(gt_masks[0])
-                print(f"\n[Batch {batch_idx}] Pred classes: {unique_preds.tolist()}, GT classes: {unique_gt.tolist()}")
-                
-            debug_count += 1
-            
-            # Report progress every 1000 frames
-            frame_count += B
-            if frame_count % 1000 == 0:
-                print(f"\n[Progress] Processed {frame_count}/{len(test_loader)} frames")
-                
             for i in range(B):
                 # Get GT mask and ensure 2D shape
                 gt_mask = gt_masks[i].squeeze()  # Remove any extra dimensions
@@ -326,11 +308,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                         size=gt_mask.shape,
                         mode='nearest'
                     ).squeeze().long()  # (H, W)
-                
-                # Debug info
-                if debug_count <= 5 and i == 0:
-                    print(f"  → Pred shape: {pred_seg.shape}, unique: {torch.unique(pred_seg).tolist()}")
-                    print(f"  → GT shape: {gt_mask.shape}, unique: {torch.unique(gt_mask).tolist()}")
                 
                 # Convert to numpy for metrics computation
                 pred_np = pred_seg.cpu().numpy()
@@ -363,9 +340,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
-    
-    print(f"\n✓ Evaluation complete! Processed {frame_count} frames total")
-    
+
     # Aggregate metrics
     from evaluation.metrics import compute_class_metrics
     classes_to_eval = range(1, num_classes+1)
@@ -408,6 +383,89 @@ def evaluate_videomt(model, test_loader, device, num_classes):
         "per_class_iou": final_per_class_iou,
         "per_class_dice": final_per_class_dice
     }
+
+
+def save_random_visualizations(
+    model,
+    dataloader,
+    device,
+    output_dir,
+    num_samples,
+    img_size,
+    is_videomt,
+    seed,
+):
+    if num_samples <= 0:
+        return
+
+    os.makedirs(output_dir, exist_ok=True)
+    rng = random.Random(seed)
+    samples = []
+    seen = 0
+
+    with torch.no_grad():
+        current_video = None
+
+        for batch in tqdm(dataloader, desc="Collecting visualizations"):
+            images = batch["image"].to(device)
+            gt_masks = batch["mask"].to(device)
+
+            if is_videomt:
+                batch_video = f"{batch['procedure'][0]}/{batch['video'][0]}"
+                if batch_video != current_video:
+                    model.reset_memory()
+                    current_video = batch_video
+
+                outputs_list = []
+                for i in range(images.shape[0]):
+                    frame = images[i:i+1]
+                    outputs_list.append(model.forward_frame(frame))
+
+                pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)
+                pred_masks = torch.cat([o['pred_masks'] for o in outputs_list], dim=0)
+
+                mask_cls = F.softmax(pred_logits, dim=-1)[:, :, :-1]
+                pred_masks_prob = torch.sigmoid(pred_masks)
+                semseg = torch.einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob)
+                preds = semseg.argmax(dim=1)
+            else:
+                outputs = model(images)
+                probs = torch.softmax(outputs, dim=1)
+                preds = torch.argmax(probs, dim=1)
+
+            for i in range(images.shape[0]):
+                seen += 1
+                if len(samples) < num_samples:
+                    samples.append((images[i].cpu(), gt_masks[i].cpu(), preds[i].cpu()))
+                else:
+                    j = rng.randint(0, seen - 1)
+                    if j < num_samples:
+                        samples[j] = (images[i].cpu(), gt_masks[i].cpu(), preds[i].cpu())
+
+    mean = dataloader.dataset.mean
+    std = dataloader.dataset.std
+
+    for idx, (img, gt_mask, pred_mask) in enumerate(samples):
+        img_np = denormalize(img, mean, std)
+        gt_np = gt_mask.squeeze().numpy().astype(np.int32)
+        pred_np = pred_mask.squeeze().numpy().astype(np.int32)
+
+        if pred_np.shape != gt_np.shape:
+            pred_np = cv2.resize(
+                pred_np.astype(np.uint8),
+                (gt_np.shape[1], gt_np.shape[0]),
+                interpolation=cv2.INTER_NEAREST
+            ).astype(np.int32)
+
+        gt_overlay = apply_mask_overlay(img_np, gt_np, color_palette)
+        pred_overlay = apply_mask_overlay(img_np, pred_np, color_palette)
+
+        row = np.concatenate([img_np, gt_overlay, pred_overlay], axis=1)
+        if row.shape[0] != img_size:
+            row = cv2.resize(row, (img_size * 3, img_size), interpolation=cv2.INTER_AREA)
+
+        out_path = os.path.join(output_dir, f"sample_{idx:02d}.png")
+        cv2.imwrite(out_path, row[:, :, ::-1])
 
 
 def main(args):
@@ -461,6 +519,21 @@ def main(args):
         metrics = evaluate_videomt(model, test_loader, device, args.num_classes)
     else:
         metrics = evaluate_model(model, test_loader, device, args.num_classes)
+
+    # Save visualizations
+    if args.visualize_samples > 0:
+        output_dir = os.path.join(args.visualize_dir, args.model)
+        save_random_visualizations(
+            model=model,
+            dataloader=test_loader,
+            device=device,
+            output_dir=output_dir,
+            num_samples=args.visualize_samples,
+            img_size=img_size,
+            is_videomt=(args.model == "videomt"),
+            seed=args.seed,
+        )
+        print(f"\nSaved {args.visualize_samples} visualizations to: {output_dir}")
     
     # Save results if requested
     if args.output:
@@ -543,6 +616,18 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Path to save results JSON file"
+    )
+    parser.add_argument(
+        "--visualize_samples",
+        type=int,
+        default=25,
+        help="Number of random samples to visualize (0 to disable)"
+    )
+    parser.add_argument(
+        "--visualize_dir",
+        type=str,
+        default="outputs/visualizations",
+        help="Directory to save visualization images"
     )
     
     args = parser.parse_args()
