@@ -163,6 +163,27 @@ def load_lh_vit_l_dinov2(n_classes):
         num_classes=n_classes)
     return model
 
+###################################
+### Loading dinov3 (HF) ###
+###################################
+
+def load_dinov3_s():
+    model = ViT(
+        img_size=(256, 256),
+        patch_size=16,
+        backbone_name="facebook/dinov3-vits16-pretrain-lvd1689m",
+    )
+    print("\nLoaded DINOv3 ViT-Small (Hugging Face) weights.")
+    return model
+
+def load_lh_vit_s_dinov3(n_classes):
+    vit = load_dinov3_s()
+    model = ViTSegmenter(
+        vit_model=vit,
+        decoder_name="linear",
+        num_classes=n_classes)
+    return model
+
 
 def load_dinov3_b():
     model = ViT(
