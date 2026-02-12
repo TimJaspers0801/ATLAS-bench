@@ -277,14 +277,13 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 outputs_list.append(output)
                 
                 # Debug first few batches
-                if debug_count < 3 and i == 0:
-                    debug_file.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
-                    debug_file.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
-                    debug_file.write(f"  pred_logits shape: {output['pred_logits'].shape}\n")
-                    debug_file.write(f"  pred_masks shape: {output['pred_masks'].shape}\n")
-                    debug_file.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
-                    debug_file.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
-                    debug_file.flush()
+                debug_file.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
+                debug_file.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
+                debug_file.write(f"  pred_logits shape: {output['pred_logits'].shape}\n")
+                debug_file.write(f"  pred_masks shape: {output['pred_masks'].shape}\n")
+                debug_file.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
+                debug_file.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
+                debug_file.flush()
                     
             debug_count += 1
             
