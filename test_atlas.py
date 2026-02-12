@@ -153,26 +153,6 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
                 print(f"  Remapping key: {old_key} → {new_key}")
                 state_dict[new_key] = state_dict.pop(old_key)
         
-        # Handle pos_embed shape mismatch: checkpoint [1, 6400, 1024], model [1, 6401, 1024]
-        # The extra token is for class token. Expand by duplicating the first token
-        if 'encoder.backbone.pos_embed' in state_dict:
-            checkpoint_pos = state_dict['encoder.backbone.pos_embed']
-            model_pos = model.encoder.backbone.pos_embed
-            
-            if checkpoint_pos.shape != model_pos.shape:
-                print(f"⚠ Pos_embed shape mismatch - expanding checkpoint embedding:")
-                print(f"  Checkpoint: {checkpoint_pos.shape}")
-                print(f"  Model:      {model_pos.shape}")
-                
-                # Expand by duplicating first token (class token)
-                # checkpoint_pos: [1, 6400, 1024] -> [1, 6401, 1024]
-                B, N, D = checkpoint_pos.shape
-                class_token = checkpoint_pos[:, :1, :]  # Take first token as class token
-                expanded_pos = torch.cat([class_token, checkpoint_pos], dim=1)  # Prepend class token
-                
-                state_dict['encoder.backbone.pos_embed'] = expanded_pos
-                print(f"  Expanded to: {expanded_pos.shape} (prepended class token)")
-        
         # Remove keys that are not part of the model
         keys_to_remove = ['criterion.empty_weight', 'attn_mask_probs', 'encoder.backbone.reg_token']
         for key in keys_to_remove:
