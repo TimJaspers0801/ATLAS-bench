@@ -250,6 +250,7 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     
     with torch.no_grad():
         current_video = None
+        debug_count = 0
         
         for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT")):
             images = batch["image"].to(device)
@@ -271,6 +272,17 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 # Online forward pass
                 output = model.forward_frame(frame)
                 outputs_list.append(output)
+                
+                # Debug first few batches
+                if debug_count < 3:
+                    print(f"\n[DEBUG Batch {batch_idx}, Frame {i}]")
+                    print(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]")
+                    print(f"  pred_logits shape: {output['pred_logits'].shape}")
+                    print(f"  pred_masks shape: {output['pred_masks'].shape}")
+                    print(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}")
+                    print(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]")
+                    
+            debug_count += 1
             
             # Combine outputs from batch
             pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)  # (B, Q, C+1)
@@ -290,6 +302,16 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 
                 # Get class prediction
                 pred_class = pred_logits_i.argmax(dim=-1).item()
+                
+                # Debug first few predictions
+                if debug_count <= 3 and i == 0:
+                    print(f"\n[DEBUG Aggregation]")
+                    print(f"  Best query idx: {best_query_idx}")
+                    print(f"  Best score: {scores[i, best_query_idx]:.3f}")
+                    print(f"  Pred class: {pred_class}")
+                    print(f"  pred_logits_i: {pred_logits_i[:10]}")  # First 10 values
+                    print(f"  pred_mask range: [{pred_mask.min():.3f}, {pred_mask.max():.3f}]")
+                    print(f"  GT mask unique values: {torch.unique(gt_masks[i])}")
                 
                 # Upsample mask to match GT size
                 if pred_mask.ndim == 2:
@@ -312,6 +334,13 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 
                 gt_np = gt_mask.cpu().numpy()
                 pred_np = pred_np.cpu().numpy()
+                
+                # Debug first few predictions
+                if debug_count <= 3 and i == 0:
+                    print(f"\n[DEBUG Semantic Map]")
+                    print(f"  Pred mask after threshold: {(pred_mask_resized > 0.5).sum()} pixels")
+                    print(f"  Final pred_np unique values: {np.unique(pred_np)}")
+                    print(f"  Final gt_np unique values: {np.unique(gt_np)}")
                 
                 # AP Handling
                 clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
