@@ -248,11 +248,14 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     current_clip = None
     ap_evaluator = None
     
+    # Debug logging
+    debug_file = open('/tmp/videomt_debug.log', 'w')
+    
     with torch.no_grad():
         current_video = None
         debug_count = 0
         
-        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT")):
+        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT", disable=debug_count<3)):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
             
@@ -275,13 +278,13 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 
                 # Debug first few batches
                 if debug_count < 3 and i == 0:
-                    from tqdm import tqdm as tqdm_module
-                    tqdm_module.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]")
-                    tqdm_module.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]")
-                    tqdm_module.write(f"  pred_logits shape: {output['pred_logits'].shape}")
-                    tqdm_module.write(f"  pred_masks shape: {output['pred_masks'].shape}")
-                    tqdm_module.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}")
-                    tqdm_module.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]")
+                    debug_file.write(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
+                    debug_file.write(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
+                    debug_file.write(f"  pred_logits shape: {output['pred_logits'].shape}\n")
+                    debug_file.write(f"  pred_masks shape: {output['pred_masks'].shape}\n")
+                    debug_file.write(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
+                    debug_file.write(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
+                    debug_file.flush()
                     
             debug_count += 1
             
@@ -306,14 +309,14 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 
                 # Debug first few predictions
                 if debug_count <= 3 and i == 0:
-                    from tqdm import tqdm as tqdm_module
-                    tqdm_module.write(f"\n[DEBUG Aggregation]")
-                    tqdm_module.write(f"  Best query idx: {best_query_idx}")
-                    tqdm_module.write(f"  Best score: {scores[i, best_query_idx]:.3f}")
-                    tqdm_module.write(f"  Pred class: {pred_class}")
-                    tqdm_module.write(f"  pred_logits_i: {pred_logits_i[:10]}")  # First 10 values
-                    tqdm_module.write(f"  pred_mask range: [{pred_mask.min():.3f}, {pred_mask.max():.3f}]")
-                    tqdm_module.write(f"  GT mask unique values: {torch.unique(gt_masks[i])}")
+                    debug_file.write(f"\n[DEBUG Aggregation]\n")
+                    debug_file.write(f"  Best query idx: {best_query_idx}\n")
+                    debug_file.write(f"  Best score: {scores[i, best_query_idx]:.3f}\n")
+                    debug_file.write(f"  Pred class: {pred_class}\n")
+                    debug_file.write(f"  pred_logits_i: {pred_logits_i[:10]}\n")  # First 10 values
+                    debug_file.write(f"  pred_mask range: [{pred_mask.min():.3f}, {pred_mask.max():.3f}]\n")
+                    debug_file.write(f"  GT mask unique values: {torch.unique(gt_masks[i])}\n")
+                    debug_file.flush()
                 
                 # Upsample mask to match GT size
                 if pred_mask.ndim == 2:
@@ -339,11 +342,11 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 
                 # Debug first few predictions
                 if debug_count <= 3 and i == 0:
-                    from tqdm import tqdm as tqdm_module
-                    tqdm_module.write(f"\n[DEBUG Semantic Map]")
-                    tqdm_module.write(f"  Pred mask after threshold: {(pred_mask_resized > 0.5).sum()} pixels")
-                    tqdm_module.write(f"  Final pred_np unique values: {np.unique(pred_np)}")
-                    tqdm_module.write(f"  Final gt_np unique values: {np.unique(gt_np)}")
+                    debug_file.write(f"\n[DEBUG Semantic Map]\n")
+                    debug_file.write(f"  Pred mask after threshold: {(pred_mask_resized > 0.5).sum()} pixels\n")
+                    debug_file.write(f"  Final pred_np unique values: {np.unique(pred_np)}\n")
+                    debug_file.write(f"  Final gt_np unique values: {np.unique(gt_np)}\n")
+                    debug_file.flush()
                 
                 # AP Handling
                 clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
@@ -370,6 +373,9 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
+    
+    debug_file.close()
+    print("\n[DEBUG] Log written to /tmp/videomt_debug.log")
     
     # Aggregate metrics
     from evaluation.metrics import compute_class_metrics
