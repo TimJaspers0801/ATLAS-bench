@@ -142,6 +142,40 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading VideoMT checkpoint: {checkpoint_path}")
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        
+        # Handle pos_embed shape mismatch due to patch_size differences
+        # Checkpoint has pos_embed [1, 6400, 1024] (80x80 patches with patch_size=14)
+        # Model might expect different size with patch_size=16
+        if 'encoder.backbone.pos_embed' in state_dict:
+            checkpoint_pos_embed = state_dict['encoder.backbone.pos_embed']
+            model_pos_embed = model.encoder.backbone.pos_embed
+            
+            if checkpoint_pos_embed.shape != model_pos_embed.shape:
+                print(f"⚠ Pos_embed shape mismatch:")
+                print(f"  Checkpoint: {checkpoint_pos_embed.shape}")
+                print(f"  Model:      {model_pos_embed.shape}")
+                
+                # Interpolate pos_embed to match model shape
+                if checkpoint_pos_embed.shape[1] != model_pos_embed.shape[1]:
+                    # Reshape to 2D and interpolate
+                    B, N, D = checkpoint_pos_embed.shape
+                    H_ckpt = W_ckpt = int(N ** 0.5)
+                    
+                    pos_embed_reshaped = checkpoint_pos_embed.reshape(B, H_ckpt, W_ckpt, D).permute(0, 3, 1, 2)
+                    
+                    B_model, N_model, D_model = model_pos_embed.shape
+                    H_model = W_model = int(N_model ** 0.5)
+                    
+                    pos_embed_interp = F.interpolate(
+                        pos_embed_reshaped,
+                        size=(H_model, W_model),
+                        mode='bilinear',
+                        align_corners=False
+                    ).permute(0, 2, 3, 1).reshape(B_model, N_model, D_model)
+                    
+                    state_dict['encoder.backbone.pos_embed'] = pos_embed_interp
+                    print(f"  Interpolated to: {pos_embed_interp.shape}")
+        
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         if not missing_keys and not unexpected_keys:
             print("✓ All keys loaded successfully")
