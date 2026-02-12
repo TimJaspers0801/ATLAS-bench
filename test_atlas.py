@@ -293,6 +293,9 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)  # (B, Q, C+1)
             pred_masks = torch.cat([o['pred_masks'] for o in outputs_list], dim=0)      # (B, Q, H, W)
             
+            # Apply sigmoid to masks to convert logits to probabilities [0, 1]
+            pred_masks = torch.sigmoid(pred_masks)
+            
             # Convert to semantic segmentation format
             # Take class with highest score across queries
             probs = F.softmax(pred_logits, dim=-1)  # (B, Q, C+1)
@@ -305,8 +308,9 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 pred_mask = pred_masks[i, best_query_idx]  # (H, W)
                 pred_logits_i = pred_logits[i, best_query_idx]  # (C+1,)
                 
-                # Get class prediction
-                pred_class = pred_logits_i.argmax(dim=-1).item()
+                # Get class prediction (exclude background class which is typically last)
+                # Only consider classes 1 to num_classes (not the background/void at index num_classes)
+                pred_class = pred_logits_i[:-1].argmax(dim=-1).item() + 1  # +1 to convert from 0-indexed to 1-indexed
                 
                 # Debug first few predictions
                 if debug_count <= 3 and i == 0:
