@@ -4,7 +4,7 @@
 #SBATCH --cpus-per-task=16                      # Specify the number of CPUs/task
 #SBATCH --gpus=1                                # Specify the number of GPUs to use
 #SBATCH --partition=gpu_h100                    # Specify the node partition
-#SBATCH --time=12:00:00                         # Specify the maximum time the job can run
+#SBATCH --time=24:00:00                         # Specify the maximum time the job can run
 
 export WANDB_API_KEY=1cf878a1b1aafcd37a1f6e6ba8fdd18ba1c4affb
 export WANDB_DIR=/gpfs/work5/0/tesr0602/Tim/SSL_Pretraining/dino/experiments/$OUTPUT_FOLDER/wandb
@@ -42,9 +42,9 @@ cd ${PROJECT_ROOT} || exit 1
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 OUTPUT_PATH=/outputs
 IMG_SIZE=256
-EPOCHS=1
+EPOCHS=10
 BATCH_SIZE=64
-NUM_CLASSES=47
+NUM_CLASSES=30
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 SEEDS=(0 1 2)

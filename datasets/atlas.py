@@ -1,11 +1,14 @@
 import random
 import zipfile
 from PIL import Image
+import numpy as np
 
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms.v2 as T
 from torchvision import tv_tensors
+
+from .class_mapping import remap_mask, mapping
 
 
 class AtlasDataset(Dataset):
@@ -165,6 +168,11 @@ class AtlasDataset(Dataset):
 
         image = self._read_from_zip(self.zf, sample["img"]).convert("RGB")
         mask = self._read_from_zip(self.zf, sample["mask"]).convert("L")
+
+        # Apply class mapping to mask
+        mask = np.array(mask)
+        mask = remap_mask(mask, mapping)
+        mask = Image.fromarray(mask.astype(np.uint8))
 
         # 1. Convert to TVTensors instead of using functional.to_mask
         # This automatically converts PIL -> Tensor and tags the type
