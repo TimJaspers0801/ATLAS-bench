@@ -248,10 +248,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     current_clip = None
     ap_evaluator = None
     
-    # Debug logging
-    debug_file = open('/tmp/videomt_debug.log', 'w')
-    print("[DEBUG] Opened debug log file: /tmp/videomt_debug.log")
-    
     with torch.no_grad():
         current_video = None
         debug_count = 0
@@ -276,16 +272,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 # Online forward pass
                 output = model.forward_frame(frame)
                 outputs_list.append(output)
-                
-                # Debug first few batches
-                if debug_count < 3 and i == 0:
-                    print(f"\n[DEBUG Batch {batch_idx}, Frame {i}]\n")
-                    print(f"  Frame shape: {frame.shape}, range: [{frame.min():.3f}, {frame.max():.3f}]\n")
-                    print(f"  pred_logits shape: {output['pred_logits'].shape}\n")
-                    print(f"  pred_masks shape: {output['pred_masks'].shape}\n")
-                    print(f"  pred_logits stats: mean={output['pred_logits'].mean():.3f}, std={output['pred_logits'].std():.3f}\n")
-                    print(f"  pred_masks stats: mean={output['pred_masks'].mean():.3f}, std={output['pred_masks'].std():.3f}, range=[{output['pred_masks'].min():.3f}, {output['pred_masks'].max():.3f}]\n")
-
                     
             debug_count += 1
             
@@ -293,63 +279,57 @@ def evaluate_videomt(model, test_loader, device, num_classes):
             pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)  # (B, Q, C+1)
             pred_masks = torch.cat([o['pred_masks'] for o in outputs_list], dim=0)      # (B, Q, H, W)
             
-            # Apply sigmoid to masks to convert logits to probabilities [0, 1]
-            pred_masks = torch.sigmoid(pred_masks)
+            # VSS Inference: Weight all query masks by their class probabilities
+            # Get class probabilities (exclude background/void class which is the last one)
+            mask_cls = F.softmax(pred_logits, dim=-1)[:, :, :-1]  # (B, Q, C)
             
-            # Convert to semantic segmentation format
-            # Take class with highest score across queries
-            probs = F.softmax(pred_logits, dim=-1)  # (B, Q, C+1)
-            scores, class_preds = probs.max(dim=-1)  # (B, Q), (B, Q)
+            # Apply sigmoid to masks to convert logits to [0, 1]
+            pred_masks_prob = torch.sigmoid(pred_masks)  # (B, Q, H, W)
             
-            # Aggregate across queries for each image
+            # Use einsum to aggregate: weight each mask by class probability
+            # Result: for each class, compute weighted sum of all masks
+            # einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob) aggregates masks weighted by class confidence
+            semseg = torch.einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob)  # (B, C, H, W)
+            
+            # Take argmax over classes (dimension 1) to get predicted class for each pixel
+            sem_mask = semseg.argmax(dim=1)  # (B, H, W) - predicted class index (0 to C-1)
+            
+            # Debug: Show aggregation info
+            if debug_count < 3:
+                print(f"\n[DEBUG VSS Aggregation - Batch {batch_idx}]")
+                print(f"  mask_cls shape: {mask_cls.shape}")
+                print(f"  pred_masks_prob shape: {pred_masks_prob.shape}")
+                print(f"  semseg shape: {semseg.shape}")
+                print(f"  sem_mask shape: {sem_mask.shape}")
+                print(f"  sem_mask range: [{sem_mask.min()}, {sem_mask.max()}]")
+                
+            debug_count += 1
             for i in range(B):
-                # Get the mask with highest confidence
-                best_query_idx = scores[i].argmax(dim=0)
-                pred_mask = pred_masks[i, best_query_idx]  # (H, W)
-                pred_logits_i = pred_logits[i, best_query_idx]  # (C+1,)
-                
-                # Get class prediction (exclude background class which is typically last)
-                # Only consider classes 1 to num_classes (not the background/void at index num_classes)
-                pred_class = pred_logits_i[:-1].argmax(dim=-1).item() + 1  # +1 to convert from 0-indexed to 1-indexed
-                
-                # Debug first few predictions
-                if debug_count <= 3 and i == 0:
-                    print(f"\n[DEBUG Aggregation]\n")
-                    print(f"  Best query idx: {best_query_idx}\n")
-                    print(f"  Best score: {scores[i, best_query_idx]:.3f}\n")
-                    print(f"  Pred class: {pred_class}\n")
-                    print(f"  pred_logits_i: {pred_logits_i[:10]}\n")  # First 10 values
-                    print(f"  pred_mask range: [{pred_mask.min():.3f}, {pred_mask.max():.3f}]\n")
-                    print(f"  GT mask unique values: {torch.unique(gt_masks[i])}\n")
-                
-                # Upsample mask to match GT size
-                if pred_mask.ndim == 2:
-                    pred_mask = pred_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
-                
                 # Get GT mask and ensure 2D shape
                 gt_mask = gt_masks[i].squeeze()  # Remove any extra dimensions
-                target_h, target_w = gt_mask.shape[-2:]
                 
-                pred_mask_resized = F.interpolate(
-                    pred_mask,
-                    size=(target_h, target_w),
-                    mode='bilinear',
-                    align_corners=False
-                ).squeeze()  # (H, W)
+                # Get predicted segmentation (semantic mask)
+                pred_seg = sem_mask[i]  # (H, W) - class indices from 0 to C-1
                 
-                # Create semantic segmentation map
-                pred_np = torch.zeros_like(gt_mask)  # (H, W)
-                pred_np[pred_mask_resized > 0.5] = pred_class
+                # Interpolate to GT size if needed
+                if pred_seg.shape != gt_mask.shape:
+                    pred_seg = pred_seg.unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
+                    pred_seg = F.interpolate(
+                        pred_seg,
+                        size=gt_mask.shape,
+                        mode='nearest'
+                    ).squeeze().long()  # (H, W)
                 
-                gt_np = gt_mask.cpu().numpy()
-                pred_np = pred_np.cpu().numpy()
-                
-                # Debug first few predictions
+                # Debug info
                 if debug_count <= 3 and i == 0:
-                    debug_file.write(f"\n[DEBUG Semantic Map]\n")
-                    print(f"  Pred mask after threshold: {(pred_mask_resized > 0.5).sum()} pixels\n")
-                    print(f"  Final pred_np unique values: {np.unique(pred_np)}\n")
-                    print(f"  Final gt_np unique values: {np.unique(gt_np)}\n")
+                    print(f"\n[DEBUG Per-Frame Processing]")
+                    print(f"  Predicted seg shape: {pred_seg.shape}")
+                    print(f"  Predicted seg unique classes: {torch.unique(pred_seg)}")
+                    print(f"  GT mask unique classes: {torch.unique(gt_mask)}")
+                
+                # Convert to numpy for metrics computation
+                pred_np = pred_seg.cpu().numpy()
+                gt_np = gt_mask.cpu().numpy()
                 
                 # AP Handling
                 clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
@@ -359,10 +339,12 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                     current_clip = clip_id
                     ap_evaluator = SegmentationAPEvaluator()
                 
-                # Binary segmentation for AP
+                # Binary segmentation for AP: foreground vs background
                 gt_binary = (gt_np > 0).astype(np.uint8)
                 pred_binary = (pred_np > 0).astype(np.uint8)
-                max_score = scores[i].max().item()
+                
+                # Use max confidence from semseg for score
+                max_score = semseg[i].max().item()
                 ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
                 
                 # Compute per-class metrics
@@ -373,17 +355,11 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                     if iou_c is not None:
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
-            
-            # Early exit for debugging
-            if debug_count >= 3:
-                print(f"[DEBUG] Stopping after {debug_count} batches for debugging")
-                break
     
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
     
-    debug_file.close()
-    print("\n[DEBUG] Log written to /tmp/videomt_debug.log")
+    print("\n[EVALUATION COMPLETE]")
     
     # Aggregate metrics
     from evaluation.metrics import compute_class_metrics
