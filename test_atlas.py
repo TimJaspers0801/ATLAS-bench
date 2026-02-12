@@ -128,18 +128,49 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
 
 def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     """Load VideoMT model for online video processing."""
-    from models.videomt.videomt_standalone import build_videomt_model
+    from models.videomt.videomt_standalone import VideoMT
     
-    # Use build_videomt_model which handles checkpoint loading properly
-    model = build_videomt_model(
-        checkpoint_path=checkpoint_path,
+    # Initialize with training configuration from ATLAS config
+    model = VideoMT(
         img_size=1280,
         num_classes=124,
         num_queries=200,
         task='vss',
         model_name='vit_large_patch14_dinov2.lvd142m',
-        device='cpu',  # We'll move to device after
     )
+    
+    if checkpoint_path and os.path.isfile(checkpoint_path):
+        print(f"Loading VideoMT checkpoint: {checkpoint_path}")
+        state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        
+        # Handle pos_embed shape mismatch: checkpoint trained without class token, model has it
+        # Checkpoint: [1, 6400, 1024], Model: [1, 6401, 1024]
+        # Solution: skip pos_embed and let it be randomly initialized, or remove class token
+        if 'encoder.backbone.pos_embed' in state_dict:
+            checkpoint_pos_shape = state_dict['encoder.backbone.pos_embed'].shape
+            model_pos_shape = model.encoder.backbone.pos_embed.shape
+            
+            if checkpoint_pos_shape != model_pos_shape:
+                print(f"⚠ Pos_embed shape mismatch - removing from checkpoint:")
+                print(f"  Checkpoint: {checkpoint_pos_shape}")
+                print(f"  Model:      {model_pos_shape}")
+                # Remove pos_embed - it will be initialized randomly and finetunng will adapt
+                del state_dict['encoder.backbone.pos_embed']
+        
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys ({len(missing_keys)}):")
+                for key in missing_keys[:5]:  # Show first 5
+                    print(f"  - {key}")
+                if len(missing_keys) > 5:
+                    print(f"  ... and {len(missing_keys) - 5} more")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys ({len(unexpected_keys)}):")
+                for key in unexpected_keys:
+                    print(f"  - {key}")
     
     return model.to(device)
 
