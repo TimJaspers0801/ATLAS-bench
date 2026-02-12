@@ -129,10 +129,11 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     """Load VideoMT model for online video processing."""
     from models.videomt.videomt_standalone import VideoMT
     
+    # Initialize with training configuration - ATLAS was trained with:
     model = VideoMT(
-        img_size=1280,
-        num_classes=124,
-        num_queries=200,
+        img_size=256,
+        num_classes=num_classes,
+        num_queries=100,
         task='vss',
         model_name='vit_large_patch14_dinov2.lvd142m',
     )
@@ -140,9 +141,20 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading VideoMT checkpoint: {checkpoint_path}")
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        msg = model.load_state_dict(state_dict, strict=False)
-        print(f"Loaded VideoMT with msg: {msg}")
-        
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys ({len(missing_keys)}):")
+                for key in missing_keys[:10]:  # Show first 10
+                    print(f"  - {key}")
+                if len(missing_keys) > 10:
+                    print(f"  ... and {len(missing_keys) - 10} more")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys ({len(unexpected_keys)}):")
+                for key in unexpected_keys:
+                    print(f"  - {key}")
     
     return model.to(device)
 
