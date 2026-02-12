@@ -143,9 +143,18 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
         print(f"Loading VideoMT checkpoint: {checkpoint_path}")
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         
+        # Handle key name mismatches between Detectron2 version and standalone
+        # The checkpoint might use different naming conventions
+        key_mappings = {
+            'q.weight': 'query_embedding.weight',  # Detectron2 uses 'q', standalone uses 'query_embedding'
+        }
+        
+        for old_key, new_key in key_mappings.items():
+            if old_key in state_dict and new_key not in state_dict:
+                print(f"  Remapping key: {old_key} → {new_key}")
+                state_dict[new_key] = state_dict.pop(old_key)
+        
         # Handle pos_embed shape mismatch: checkpoint trained without class token, model has it
-        # Checkpoint: [1, 6400, 1024], Model: [1, 6401, 1024]
-        # Solution: skip pos_embed and let it be randomly initialized, or remove class token
         if 'encoder.backbone.pos_embed' in state_dict:
             checkpoint_pos_shape = state_dict['encoder.backbone.pos_embed'].shape
             model_pos_shape = model.encoder.backbone.pos_embed.shape
@@ -154,8 +163,19 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
                 print(f"⚠ Pos_embed shape mismatch - removing from checkpoint:")
                 print(f"  Checkpoint: {checkpoint_pos_shape}")
                 print(f"  Model:      {model_pos_shape}")
-                # Remove pos_embed - it will be initialized randomly and finetunng will adapt
                 del state_dict['encoder.backbone.pos_embed']
+        
+        # Remove keys that are not part of the model (e.g., criterion, training-specific)
+        keys_to_remove = ['criterion.empty_weight', 'attn_mask_probs']
+        for key in keys_to_remove:
+            if key in state_dict:
+                print(f"  Removing non-model key: {key}")
+                del state_dict[key]
+        
+        # Remove reg_token if it exists (DINOv2 register tokens)
+        if 'encoder.backbone.reg_token' in state_dict:
+            print(f"  Removing reg_token (not in standalone model)")
+            del state_dict['encoder.backbone.reg_token']
         
         missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
         if not missing_keys and not unexpected_keys:
@@ -163,10 +183,17 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
         else:
             if missing_keys:
                 print(f"⚠ Missing keys ({len(missing_keys)}):")
-                for key in missing_keys[:5]:  # Show first 5
-                    print(f"  - {key}")
-                if len(missing_keys) > 5:
-                    print(f"  ... and {len(missing_keys) - 5} more")
+                # pixel_mean/pixel_std are buffers that will be initialized by register_buffer
+                # They can be missing without affecting functionality
+                important_missing = [k for k in missing_keys if 'pixel_' not in k and 'pos_embed' not in k]
+                if important_missing:
+                    print(f"  Important missing keys:")
+                    for key in important_missing[:5]:
+                        print(f"    - {key}")
+                    if len(important_missing) > 5:
+                        print(f"    ... and {len(important_missing) - 5} more")
+                else:
+                    print(f"  (Only pixel normalization and pos_embed missing, which is acceptable)")
             if unexpected_keys:
                 print(f"⚠ Unexpected keys ({len(unexpected_keys)}):")
                 for key in unexpected_keys:
