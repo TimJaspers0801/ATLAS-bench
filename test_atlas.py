@@ -140,7 +140,14 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading VideoMT checkpoint: {checkpoint_path}")
         state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        model.load_state_dict(state_dict, strict=False)
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys: {len(missing_keys)}")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
     
     return model.to(device)
 
@@ -236,19 +243,22 @@ def evaluate_videomt(model, test_loader, device, num_classes):
                 if pred_mask.ndim == 2:
                     pred_mask = pred_mask.unsqueeze(0).unsqueeze(0)  # (1, 1, H, W)
                 
-                target_h, target_w = gt_masks[i].shape[-2:]
+                # Get GT mask and ensure 2D shape
+                gt_mask = gt_masks[i].squeeze()  # Remove any extra dimensions
+                target_h, target_w = gt_mask.shape[-2:]
+                
                 pred_mask_resized = F.interpolate(
                     pred_mask,
                     size=(target_h, target_w),
                     mode='bilinear',
                     align_corners=False
-                ).squeeze()
+                ).squeeze()  # (H, W)
                 
                 # Create semantic segmentation map
-                pred_np = torch.zeros_like(gt_masks[i])
+                pred_np = torch.zeros_like(gt_mask)  # (H, W)
                 pred_np[pred_mask_resized > 0.5] = pred_class
                 
-                gt_np = gt_masks[i].cpu().numpy()
+                gt_np = gt_mask.cpu().numpy()
                 pred_np = pred_np.cpu().numpy()
                 
                 # AP Handling
