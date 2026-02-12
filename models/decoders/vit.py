@@ -66,7 +66,7 @@ class ViT(nn.Module):
         if hasattr(backbone.patch_embed, 'mask_token'):
             del backbone.patch_embed.mask_token
 
-        return backbone        return backbone
+        return backbone        
 
 
 class ViTBackbone(nn.Module):
