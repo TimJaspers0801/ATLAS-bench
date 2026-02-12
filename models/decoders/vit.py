@@ -89,8 +89,9 @@ class ViTBackbone(nn.Module):
             self.backbone = vit_model
             self.is_vit_wrapper = False
         
-        # Check if this is native DINOv3 (has prepare_tokens_with_masks)
+        # Check model type
         self.is_native_dinov3 = hasattr(self.backbone, 'prepare_tokens_with_masks')
+        self.is_hf_model = hasattr(self.backbone, '__class__') and 'transformers' in str(type(self.backbone).__module__)
         
         # Get model properties
         if hasattr(self.backbone.patch_embed, 'patch_size'):
@@ -107,6 +108,25 @@ class ViTBackbone(nn.Module):
             # Native DINOv3: Use custom forward pass
             features = self.backbone(x)
             # Native DINOv3 returns (B, N, C) with prefix tokens already removed
+            B, N, C = features.shape
+            H = W = int(N ** 0.5)
+            features = features.transpose(1, 2).reshape(B, C, H, W)
+            return features
+        elif self.is_hf_model:
+            # HuggingFace model: Use direct forward (converted by transformers_to_timm)
+            # The ViT wrapper's transformers_to_timm already set up blocks, patch_embed, etc.
+            x = self.backbone.patch_embed(x)
+            for blk in self.backbone.blocks:
+                x = blk(x)
+            features = self.backbone.norm(x)
+            
+            # Remove prefix tokens (CLS + register tokens)
+            B, N, C = features.shape
+            num_prefix = getattr(self.backbone, 'num_prefix_tokens', 1)
+            if num_prefix > 0:
+                features = features[:, num_prefix:, :]
+            
+            # Reshape to spatial grid
             B, N, C = features.shape
             H = W = int(N ** 0.5)
             features = features.transpose(1, 2).reshape(B, C, H, W)
