@@ -500,37 +500,37 @@ def get_param_groups_llrd(model: torch.nn.Module, base_lr: float, weight_decay: 
 
     return param_groups
 
-def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 5):
+def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov2_s
     encoder = load_dinov2_s()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
-def eomt_vitb_dinov2(num_classes: int = 19, num_q: int = 5):
+def eomt_vitb_dinov2(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov2_b
     encoder = load_dinov2_b()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
-def eomt_vitl_dinov2(num_classes: int = 19, num_q: int = 5):
+def eomt_vitl_dinov2(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov2_l
     encoder = load_dinov2_l()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
-def eomt_vits_dinov3(num_classes: int = 19, num_q: int = 5):
+def eomt_vits_dinov3(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov3_s
     encoder = load_dinov3_s()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
-def eomt_vitb_dinov3(num_classes: int = 19, num_q: int = 5):
+def eomt_vitb_dinov3(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov3_b
     encoder = load_dinov3_b()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
-def eomt_vitl_dinov3(num_classes: int = 19, num_q: int = 5):
+def eomt_vitl_dinov3(num_classes: int = 19, num_q: int = 100):
     from models.load_models import load_dinov3_l
     encoder = load_dinov3_l()
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
