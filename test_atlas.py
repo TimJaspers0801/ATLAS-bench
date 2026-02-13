@@ -227,7 +227,7 @@ def load_eomt(checkpoint_path: str, num_classes: int, device: torch.device):
     return model.to(device)
 
 
-def evaluate_videomt(model, test_loader, device, num_classes):
+def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
     """
     Evaluate VideoMT in online fashion, processing frames sequentially
     within each clip while maintaining temporal state.
@@ -250,26 +250,6 @@ def evaluate_videomt(model, test_loader, device, num_classes):
         if not frames:
             return
 
-        frames_tensor = torch.stack(frames, dim=0).to(device)
-        outputs = model.process_video(frames_tensor, normalize=False, match_queries=True)
-
-        pred_logits = outputs['pred_logits'][0]  # (Q, C+1)
-        pred_masks = outputs['pred_masks'][0]    # (Q, T, H, W)
-
-        target_h, target_w = gts[0].shape[-2:]
-        if pred_masks.shape[-2:] != (target_h, target_w):
-            pred_masks = F.interpolate(
-                pred_masks,
-                size=(target_h, target_w),
-                mode='bilinear',
-                align_corners=False,
-            )
-
-        mask_cls = F.softmax(pred_logits, dim=-1)[:, :-1]  # (Q, C)
-        mask_pred = pred_masks.sigmoid()  # (Q, T, H, W)
-        semseg = torch.einsum("qc,qthw->cthw", mask_cls, mask_pred)
-        sem_score, sem_mask = semseg.max(0)  # (T, H, W)
-
         if ap_evaluator is not None:
             clip_ap[current_clip] = ap_evaluator.evaluate()
         current_clip = clip_id
@@ -277,21 +257,46 @@ def evaluate_videomt(model, test_loader, device, num_classes):
 
         classes_to_eval = range(1, num_classes + 1)
 
-        for t in range(sem_mask.shape[0]):
-            pred_np = sem_mask[t].cpu().numpy()
-            gt_np = gts[t].squeeze().cpu().numpy()
+        for start in range(0, len(frames), window_size):
+            end = min(start + window_size, len(frames))
+            window_frames = frames[start:end]
+            window_gts = gts[start:end]
 
-            gt_binary = (gt_np > 0).astype(np.uint8)
-            pred_binary = (pred_np > 0).astype(np.uint8)
-            max_score = sem_score[t].max().item()
-            ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
+            frames_tensor = torch.stack(window_frames, dim=0).to(device)
+            outputs = model.process_video(frames_tensor, normalize=False, match_queries=True)
 
-            from evaluation.metrics import compute_class_metrics
-            for c in classes_to_eval:
-                iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
-                if iou_c is not None:
-                    class_ious[c].append(iou_c)
-                    class_dices[c].append(dice_c)
+            pred_logits = outputs['pred_logits'][0]  # (Q, C+1)
+            pred_masks = outputs['pred_masks'][0]    # (Q, T, H, W)
+
+            target_h, target_w = window_gts[0].shape[-2:]
+            if pred_masks.shape[-2:] != (target_h, target_w):
+                pred_masks = F.interpolate(
+                    pred_masks,
+                    size=(target_h, target_w),
+                    mode='bilinear',
+                    align_corners=False,
+                )
+
+            mask_cls = F.softmax(pred_logits, dim=-1)[:, :-1]  # (Q, C)
+            mask_pred = pred_masks.sigmoid()  # (Q, T, H, W)
+            semseg = torch.einsum("qc,qthw->cthw", mask_cls, mask_pred)
+            sem_score, sem_mask = semseg.max(0)  # (T, H, W)
+
+            for t in range(sem_mask.shape[0]):
+                pred_np = sem_mask[t].cpu().numpy()
+                gt_np = window_gts[t].squeeze().cpu().numpy()
+
+                gt_binary = (gt_np > 0).astype(np.uint8)
+                pred_binary = (pred_np > 0).astype(np.uint8)
+                max_score = sem_score[t].max().item()
+                ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
+
+                from evaluation.metrics import compute_class_metrics
+                for c in classes_to_eval:
+                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
+                    if iou_c is not None:
+                        class_ious[c].append(iou_c)
+                        class_dices[c].append(dice_c)
 
     with torch.no_grad():
         current_clip = None
@@ -498,7 +503,13 @@ def main(args):
     # Evaluate
     print(f"\nEvaluating on test set...")
     if args.model == "videomt":
-        metrics = evaluate_videomt(model, test_loader, device, args.num_classes)
+        metrics = evaluate_videomt(
+            model,
+            test_loader,
+            device,
+            args.num_classes,
+            window_size=args.videomt_window,
+        )
     else:
         metrics = evaluate_model(model, test_loader, device, args.num_classes)
 
@@ -616,6 +627,12 @@ if __name__ == "__main__":
         type=str,
         default="outputs/visualizations",
         help="Directory to save visualization images"
+    )
+    parser.add_argument(
+        "--videomt_window",
+        type=int,
+        default=16,
+        help="Window size for VideoMT clip processing to limit memory usage"
     )
     
     args = parser.parse_args()
