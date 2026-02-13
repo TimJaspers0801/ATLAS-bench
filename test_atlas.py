@@ -139,6 +139,8 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
         num_queries=200,
         task='vss',
         model_name='vit_large_patch14_dinov2.lvd142m',
+        pixel_mean=[0.485, 0.456, 0.406],
+        pixel_std=[0.229, 0.224, 0.225],
     )
     
     if checkpoint_path and os.path.isfile(checkpoint_path):
@@ -244,6 +246,9 @@ def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
     current_clip = None
     ap_evaluator = None
     
+    mean = torch.tensor(test_loader.dataset.mean).view(3, 1, 1)
+    std = torch.tensor(test_loader.dataset.std).view(3, 1, 1)
+
     def process_clip(clip_id, frames, gts):
         nonlocal current_clip, ap_evaluator
 
@@ -263,7 +268,7 @@ def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
             window_gts = gts[start:end]
 
             frames_tensor = torch.stack(window_frames, dim=0).to(device)
-            outputs = model.process_video(frames_tensor, normalize=False, match_queries=True)
+            outputs = model.process_video(frames_tensor, normalize=True, match_queries=True)
 
             pred_logits = outputs['pred_logits'][0]  # (Q, C+1)
             pred_masks = outputs['pred_masks'][0]    # (Q, T, H, W)
@@ -319,7 +324,8 @@ def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
                     clip_gts = []
                     current_clip = clip_id
 
-                clip_frames.append(images[i].cpu())
+                frame = images[i].cpu() * std + mean
+                clip_frames.append(frame.clamp(0.0, 1.0))
                 clip_gts.append(gt_masks[i].cpu())
 
         process_clip(current_clip, clip_frames, clip_gts)
@@ -389,6 +395,9 @@ def save_random_visualizations(
     samples = []
     seen = 0
 
+    mean = torch.tensor(dataloader.dataset.mean).view(3, 1, 1)
+    std = torch.tensor(dataloader.dataset.std).view(3, 1, 1)
+
     with torch.no_grad():
         current_video = None
 
@@ -402,9 +411,13 @@ def save_random_visualizations(
                     model.reset_memory()
                     current_video = batch_video
 
+                images_denorm = images.cpu() * std + mean
+                images_denorm = images_denorm.clamp(0.0, 1.0)
+                images_denorm = images_denorm.to(device)
+
                 outputs_list = []
                 for i in range(images.shape[0]):
-                    frame = images[i:i+1]
+                    frame = images_denorm[i:i+1]
                     outputs_list.append(model.forward_frame(frame))
 
                 pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)
@@ -427,9 +440,6 @@ def save_random_visualizations(
                     j = rng.randint(0, seen - 1)
                     if j < num_samples:
                         samples[j] = (images[i].cpu(), gt_masks[i].cpu(), preds[i].cpu())
-
-    mean = dataloader.dataset.mean
-    std = dataloader.dataset.std
 
     for idx, (img, gt_mask, pred_mask) in enumerate(samples):
         img_np = denormalize(img, mean, std)
