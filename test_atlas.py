@@ -631,7 +631,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--videomt_window",
         type=int,
-        default=16,
+        default=4,
         help="Window size for VideoMT clip processing to limit memory usage"
     )
     
