@@ -27,13 +27,17 @@ class ViT(nn.Module):
     
     def __init__(self, img_size: int, name: str, patch_size: int = 16):
         super().__init__()
+        # Load without pretrained weights because:
+        # 1. Pretrained weights have class_token=True (DINOv2 standard)
+        # 2. We're using class_token=False to match our checkpoint
+        # 3. We'll load the VideoMT checkpoint instead which has correct weights
         self.backbone = timm.create_model(
             name,
-            pretrained=True,
+            pretrained=False,  # Don't load DINOv2 pretrained (incompatible structure)
             img_size=img_size,
             patch_size=patch_size,
             num_classes=0,
-            class_token=False,  # CRITICAL: Checkpoint was trained without class token
+            class_token=False,  # Checkpoint was trained without class token
             global_pool='',  # Disable global pooling when class_token=False
             dynamic_img_size=True,
         )
