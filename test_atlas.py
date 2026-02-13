@@ -473,6 +473,7 @@ def main(args):
         zip_path=args.data_path,
         split="test",
         transform=test_transform,
+        frame_percentage=args.test_percentage,
         seed=args.seed,
     )
     
@@ -597,6 +598,12 @@ if __name__ == "__main__":
         type=str,
         default=None,
         help="Path to save results JSON file"
+    )
+    parser.add_argument(
+        "--test_percentage",
+        type=int,
+        default=10,
+        help="Percentage of test frames to evaluate (1-100)"
     )
     parser.add_argument(
         "--visualize_samples",
