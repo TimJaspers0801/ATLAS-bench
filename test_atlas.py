@@ -231,8 +231,29 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         else:
             state_dict = checkpoint
         
-        msg = model.load_state_dict(state_dict, strict=False)
-        print(msg)    
+        # Strip "network." prefix if present (from Lightning module checkpoints)
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            if key.startswith("network."):
+                new_key = key[len("network."):]
+                new_state_dict[new_key] = value
+            else:
+                new_state_dict[key] = value
+        
+        # Remove criterion keys if present
+        keys_to_remove = [k for k in new_state_dict.keys() if k.startswith("criterion.")]
+        for key in keys_to_remove:
+            del new_state_dict[key]
+        
+        missing_keys, unexpected_keys = model.load_state_dict(new_state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys: {len(missing_keys)}")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
+    
     return model.to(device)
 
 
