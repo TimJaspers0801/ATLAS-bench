@@ -73,7 +73,17 @@ def apply_mask_overlay(image, mask, palette, ignore_index=255):
 
 
 @torch.no_grad()
-def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=3, frames_per_clip=4):
+def collect_visual_grids(
+    model,
+    dataloader,
+    device,
+    palette,
+    mean,
+    std,
+    n_clips=3,
+    frames_per_clip=4,
+    mask_background=False,
+):
     model.eval()
     grids = []
 
@@ -93,6 +103,10 @@ def collect_visual_grids(model, dataloader, device, palette, mean, std, n_clips=
 
             gt_m = masks[i].cpu().numpy().squeeze()
             pr_m = preds[i].cpu().numpy()
+
+            if mask_background:
+                pr_m = pr_m.copy()
+                pr_m[gt_m == 0] = 0
 
             gt_ov = apply_mask_overlay(img, gt_m, palette)
             pr_ov = apply_mask_overlay(img, pr_m, palette)

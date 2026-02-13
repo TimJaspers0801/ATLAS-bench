@@ -24,6 +24,13 @@ from evaluation.visual_logging import collect_visual_grids
 import numpy as np
 
 
+def mask_background_to_ignore(masks: torch.Tensor, ignore_index: int = 255) -> torch.Tensor:
+    """Map background class (0) to ignore_index for loss computation."""
+    masks = masks.clone()
+    masks[masks == 0] = ignore_index
+    return masks
+
+
 def train(args):
     # set random seeds
     random.seed(args.seed)
@@ -238,6 +245,7 @@ def train(args):
             masks = batch["mask"].to(device)
 
             images, masks = images.to(device), masks.to(device).squeeze()
+            masks = mask_background_to_ignore(masks, ignore_index=255)
 
             outputs = model(images)
             loss = criterion(outputs, masks.long())
@@ -266,7 +274,8 @@ def train(args):
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes
+            num_classes=args.num_classes,
+            ignore_background=True,
         )
 
         wandb.log({
@@ -289,6 +298,7 @@ def train(args):
                     palette=bgr_palette,
                     mean=val_loader.dataset.mean,
                     std=val_loader.dataset.std,
+                    mask_background=True,
                 )
 
                 # Create a list of wandb.Image objects
@@ -332,18 +342,20 @@ def train(args):
     print(f"Loading best model from {best_model_path} for final evaluation.")
     load_checkpoint(model, best_model_path)
     print("Evaluating on Validation set...")
-    val_metrics = evaluate_model(
+        val_metrics = evaluate_model(
             model=model,
             dataloader=val_loader,
             device=device,
-            num_classes=args.num_classes
+            num_classes=args.num_classes,
+            ignore_background=True,
     )
     print("Evaluating on Test set...")
-    test_metrics = evaluate_model(
+        test_metrics = evaluate_model(
             model=model,
             dataloader=test_loader,
             device=device,
-            num_classes=args.num_classes
+            num_classes=args.num_classes,
+            ignore_background=True,
     )
     # Log final results
     wandb.log({
