@@ -236,9 +236,19 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         for key, value in state_dict.items():
             if key.startswith("network."):
                 new_key = key[len("network."):]
-                new_state_dict[new_key] = value
             else:
-                new_state_dict[key] = value
+                new_key = key
+            
+            # Remap keys from timm naming to HuggingFace naming (if needed)
+            # timm: encoder.backbone.blocks.X -> HF: encoder.backbone.layer.X
+            # timm: encoder.backbone.patch_embed -> HF: encoder.backbone.embeddings
+            if "encoder.backbone.blocks." in new_key:
+                new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
+            elif new_key.startswith("encoder.backbone.patch_embed."):
+                # Replace patch_embed with embeddings, but keep patch_embeddings as is
+                new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
+            
+            new_state_dict[new_key] = value
         
         # Remove criterion keys if present
         keys_to_remove = [k for k in new_state_dict.keys() if k.startswith("criterion.")]
