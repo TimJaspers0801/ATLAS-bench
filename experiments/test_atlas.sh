@@ -66,18 +66,18 @@ MODELS=(
     # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|32"
     
     # # SurgeNet Baselines
-    # "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
+    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
     # "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|32"
     # "surgenet-caformer-s18|best_model.pth|caformer_atlas|0|32"
     
     # VideoMT (requires batch_size=1 for online processing)
-    "videomt|best_model.pth|videomt_atlas|0|1"
-    "videomt|best_model.pth|videomt_atlas|1|1"
-    "videomt|best_model.pth|videomt_atlas|2|1"
+    # "videomt|best_model.pth|videomt_atlas|0|1"
+    # "videomt|best_model.pth|videomt_atlas|1|1"
+    # "videomt|best_model.pth|videomt_atlas|2|1"
     
     # Other models (commented out by default)
-    # "endofm|best_model.pth|endofm_atlas|0|32"
-    # "endovit|best_model.pth|endovit_atlas|0|32"
+    "endofm|best_model.pth|endofm_atlas|0|32"
+    "endovit|best_model.pth|endovit_atlas|0|32"
     # "gastronet5m|best_model.pth|gastronet5m_atlas|0|32"
 )
 
