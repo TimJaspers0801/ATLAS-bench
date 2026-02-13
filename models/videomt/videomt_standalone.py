@@ -34,6 +34,7 @@ class ViT(nn.Module):
             patch_size=patch_size,
             num_classes=0,
             class_token=False,  # CRITICAL: Checkpoint was trained without class token
+            global_pool='',  # Disable global pooling when class_token=False
             dynamic_img_size=True,
         )
         self.backbone.patch_embed.strict_img_size = False
