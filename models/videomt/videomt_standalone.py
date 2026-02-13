@@ -33,6 +33,7 @@ class ViT(nn.Module):
             img_size=img_size,
             patch_size=patch_size,
             num_classes=0,
+            class_token=False,  # CRITICAL: Checkpoint was trained without class token
             dynamic_img_size=True,
         )
         self.backbone.patch_embed.strict_img_size = False

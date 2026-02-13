@@ -157,28 +157,14 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
                 print(f"  Remapping key: {old_key} → {new_key}")
                 state_dict[new_key] = state_dict.pop(old_key)
         
-        # Handle pos_embed shape mismatch: checkpoint was trained without class token
-        # Checkpoint: [1, 6400, 1024] (no class token), Model: [1, 6401, 1024] (with class token)
-        if 'encoder.backbone.pos_embed' in state_dict:
-            checkpoint_pos = state_dict['encoder.backbone.pos_embed']
-            model_pos = model.encoder.backbone.pos_embed
-            
-            if checkpoint_pos.shape != model_pos.shape:
-                print(f"⚠ Pos_embed shape mismatch - checkpoint trained without class token:")
-                print(f"  Checkpoint: {checkpoint_pos.shape}")
-                print(f"  Model:      {model_pos.shape}")
-                
-                # Add position embedding for class token (prepend zeros)
-                B, N, D = checkpoint_pos.shape
-                class_pos_embed = torch.zeros(B, 1, D)  # Initialize class token pos_embed to zero
-                expanded_pos = torch.cat([class_pos_embed, checkpoint_pos], dim=1)  # Prepend to match model
-                
-                state_dict['encoder.backbone.pos_embed'] = expanded_pos
-                print(f"  Expanded to: {expanded_pos.shape} (added zero-initialized class token position)")
+        # NOTE: Model is now created with class_token=False to match checkpoint structure
+        # Both checkpoint and model now have: [spatial_tokens only], no class token
+        # No pos_embed expansion needed
         
         # Remove keys that are not part of the model
         keys_to_remove = ['criterion.empty_weight', 'attn_mask_probs', 'encoder.backbone.reg_token']
         for key in keys_to_remove:
+
             if key in state_dict:
                 print(f"  Removing non-model key: {key}")
                 del state_dict[key]
