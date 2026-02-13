@@ -122,22 +122,23 @@ for model_config in "${MODELS[@]}"; do
             CHECKPOINT_PATH="${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
         else
             # Try glob pattern for models with metadata in filename (e.g., best_model_epoch_50_dice_0.8234.pt)
-            # Get base name and extension
+            # Get base name (without extension)
             base_name="${CHECKPOINT_PATTERN%.*}"
-            ext="${CHECKPOINT_PATTERN##*.}"
             
-            # Find first matching file
-            for f in "${OUTPUT_PATH}/${base_name}"_*.${ext}; do
-                if [ -f "$f" ]; then
-                    CHECKPOINT_PATH="$f"
-                    break
-                fi
+            # Try both .pt and .pth extensions
+            for ext in pt pth; do
+                for f in "${OUTPUT_PATH}/${base_name}"_*.${ext}; do
+                    if [ -f "$f" ]; then
+                        CHECKPOINT_PATH="$f"
+                        break 2  # Break out of both loops
+                    fi
+                done
             done
         fi
         
         if [ -z "${CHECKPOINT_PATH}" ] || [ ! -f "${CHECKPOINT_PATH}" ]; then
             echo "⚠️  Checkpoint not found matching pattern: ${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
-            echo "Tried: ${OUTPUT_PATH}/${base_name}_*.${ext}"
+            echo "Tried: ${OUTPUT_PATH}/${base_name}_*.{pt,pth}"
             echo "Skipping..."
             continue
         fi
