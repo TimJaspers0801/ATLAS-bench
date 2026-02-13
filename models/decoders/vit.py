@@ -47,7 +47,6 @@ class ViT(nn.Module):
         self.register_buffer("pixel_std", pixel_std)
 
     def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
-        # Add timm-style attributes (keep originals for HF forward)
         backbone.patch_embed = backbone.embeddings
         backbone.patch_embed.patch_size = (
             backbone.embeddings.config.patch_size,
@@ -62,9 +61,12 @@ class ViT(nn.Module):
         backbone.num_prefix_tokens = backbone.embeddings.config.num_register_tokens + 1
         backbone.blocks = backbone.layer
 
-        # Only delete mask_token (not embeddings/layer, needed for HF forward)
-        if hasattr(backbone.patch_embed, 'mask_token'):
-            del backbone.patch_embed.mask_token
+        # Delete original HF attributes to keep only timm-style naming
+        del (
+            backbone.patch_embed.mask_token,
+            backbone.embeddings,
+            backbone.layer,
+        )
 
         return backbone        
 

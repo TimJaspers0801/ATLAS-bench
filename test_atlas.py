@@ -239,15 +239,6 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
             else:
                 new_key = key
             
-            # Remap keys from timm naming to HuggingFace naming (if needed)
-            # timm: encoder.backbone.blocks.X -> HF: encoder.backbone.layer.X
-            # timm: encoder.backbone.patch_embed -> HF: encoder.backbone.embeddings
-            if "encoder.backbone.blocks." in new_key:
-                new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
-            elif new_key.startswith("encoder.backbone.patch_embed."):
-                # Replace patch_embed with embeddings, but keep patch_embeddings as is
-                new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
-            
             new_state_dict[new_key] = value
         
         # Remove criterion keys if present
@@ -255,8 +246,22 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         for key in keys_to_remove:
             del new_state_dict[key]
         
-        msg = model.load_state_dict(new_state_dict, strict=False)
-        print(msg)
+        missing_keys, unexpected_keys = model.load_state_dict(new_state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys: {len(missing_keys)}")
+                for key in list(missing_keys)[:5]:
+                    print(f"    {key}")
+                if len(missing_keys) > 5:
+                    print(f"    ... and {len(missing_keys) - 5} more")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
+                for key in list(unexpected_keys)[:5]:
+                    print(f"    {key}")
+                if len(unexpected_keys) > 5:
+                    print(f"    ... and {len(unexpected_keys) - 5} more")
         
     return model.to(device)
 
