@@ -216,6 +216,8 @@ def train(args):
         best_dice = float(last_checkpoint.split('_')[-1].replace('.pt', ''))
         best_epoch = int(last_checkpoint.split('_')[3])
         print(f"Resuming from last checkpoint: {last_checkpoint} with dice {best_dice:.4f}")
+        # Checkpoint naming format: best_model_epoch_{epoch}_dice_{dice:.4f}.pt
+        # This includes metadata for easy identification and recovery
         best_model_path = os.path.join(
             output_path,
             f"best_model_epoch_{best_epoch}_dice_{best_dice:.4f}.pt"
@@ -308,6 +310,7 @@ def train(args):
             best_dice = current_score
             best_epoch = epoch
 
+            # Checkpoint naming format: best_model_epoch_{epoch}_dice_{dice:.4f}.pt
             best_model_path = os.path.join(
                 output_path,
                 f"best_model_epoch_{epoch}_dice_{current_score:.4f}.pt"

@@ -44,7 +44,14 @@ BATCH_SIZE=32
 
 # Define all models to test
 # Format: "model_name|checkpoint_pattern|experiment_pattern|seed|batch_size"
-
+#
+# NOTE: Checkpoint naming conventions:
+#   - VideoMT/EOMT models: save as "best_model.pth" (exact name)
+#   - Other models: save as "best_model_epoch_N_dice_X.XXXX.pt" (with metadata)
+#   
+# The script automatically handles both patterns:
+#   - Tries exact match first (for best_model.pth)
+#   - Falls back to glob pattern matching for best_model_*.pt variants
 MODELS=(
     # # DINOv2 Pretrained
     # "lh-vit-s-dinov2|None|lh_vits_dinov2_atlas|0|32"
@@ -108,11 +115,29 @@ for model_config in "${MODELS[@]}"; do
     
     # Build checkpoint argument
     if [ "${CHECKPOINT_PATTERN}" != "None" ]; then
-        CHECKPOINT_PATH="${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
+        CHECKPOINT_PATH=""
         
-        # Check if checkpoint exists
-        if [ ! -f "${CHECKPOINT_PATH}" ]; then
-            echo "⚠️  Checkpoint not found: ${CHECKPOINT_PATH}"
+        # Try exact match first (for videomt/eomt with simple best_model.pth)
+        if [ -f "${OUTPUT_PATH}/${CHECKPOINT_PATTERN}" ]; then
+            CHECKPOINT_PATH="${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
+        else
+            # Try glob pattern for models with metadata in filename (e.g., best_model_epoch_50_dice_0.8234.pt)
+            # Get base name and extension
+            base_name="${CHECKPOINT_PATTERN%.*}"
+            ext="${CHECKPOINT_PATTERN##*.}"
+            
+            # Find first matching file
+            for f in "${OUTPUT_PATH}/${base_name}"_*.${ext}; do
+                if [ -f "$f" ]; then
+                    CHECKPOINT_PATH="$f"
+                    break
+                fi
+            done
+        fi
+        
+        if [ -z "${CHECKPOINT_PATH}" ] || [ ! -f "${CHECKPOINT_PATH}" ]; then
+            echo "⚠️  Checkpoint not found matching pattern: ${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
+            echo "Tried: ${OUTPUT_PATH}/${base_name}_*.${ext}"
             echo "Skipping..."
             continue
         fi
