@@ -350,12 +350,12 @@ def train(args):
         ignore_background=True,
     )
     print("Evaluating on Test set...")
-        test_metrics = evaluate_model(
-            model=model,
-            dataloader=test_loader,
-            device=device,
-            num_classes=args.num_classes,
-            ignore_background=True,
+    test_metrics = evaluate_model(
+        model=model,
+        dataloader=test_loader,
+        device=device,
+        num_classes=args.num_classes,
+        ignore_background=True,
     )
     # Log final results
     wandb.log({
