@@ -342,12 +342,12 @@ def train(args):
     print(f"Loading best model from {best_model_path} for final evaluation.")
     load_checkpoint(model, best_model_path)
     print("Evaluating on Validation set...")
-        val_metrics = evaluate_model(
-            model=model,
-            dataloader=val_loader,
-            device=device,
-            num_classes=args.num_classes,
-            ignore_background=True,
+    val_metrics = evaluate_model(
+        model=model,
+        dataloader=val_loader,
+        device=device,
+        num_classes=args.num_classes,
+        ignore_background=True,
     )
     print("Evaluating on Test set...")
         test_metrics = evaluate_model(
