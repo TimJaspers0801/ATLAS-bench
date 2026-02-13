@@ -131,23 +131,34 @@ class ViTBackbone(nn.Module):
             features = features.transpose(1, 2).reshape(B, C, H, W)
             return features
         else:
-            # timm ViT: Use forward_features which handles everything
+            # timm ViT or GastroNet: Use forward_features where available
             features = self.backbone.forward_features(x)
-            
+
+            # GastroNet forward_features returns a dict
+            if isinstance(features, dict):
+                if "x_norm_patchtokens" in features:
+                    features = features["x_norm_patchtokens"]
+                elif "x_prenorm" in features:
+                    # Drop prefix tokens from pre-norm tokens
+                    tokens = features["x_prenorm"]
+                    num_prefix = getattr(self.backbone, "num_register_tokens", 0) + 1
+                    features = tokens[:, num_prefix:, :]
+                else:
+                    raise ValueError("Unsupported GastroNet feature dict keys")
+
             # forward_features returns (B, N, C) where N includes prefix tokens
             B, N, C = features.shape
-            
+
             # Remove prefix tokens (CLS + register tokens)
             num_prefix = getattr(self.backbone, 'num_prefix_tokens', 1)
             if num_prefix > 0:
                 features = features[:, num_prefix:, :]
-            
+
             # Reshape to spatial grid
             B, N, C = features.shape
             H = W = int(N ** 0.5)
             features = features.transpose(1, 2).reshape(B, C, H, W)
-            
-            return features
+
             return features
 
 class ViTSegmenter(nn.Module):
