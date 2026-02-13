@@ -223,7 +223,22 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
     
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading EOMT checkpoint: {checkpoint_path}")
-        load_checkpoint(model, checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        
+        # EOMT checkpoints are already the state dict (not wrapped in a dict with 'model' key)
+        if isinstance(checkpoint, dict) and "model" in checkpoint:
+            state_dict = checkpoint["model"]
+        else:
+            state_dict = checkpoint
+        
+        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+        if not missing_keys and not unexpected_keys:
+            print("✓ All keys loaded successfully")
+        else:
+            if missing_keys:
+                print(f"⚠ Missing keys: {len(missing_keys)}")
+            if unexpected_keys:
+                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
     
     return model.to(device)
 
