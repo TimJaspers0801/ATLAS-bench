@@ -231,15 +231,8 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         else:
             state_dict = checkpoint
         
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        if not missing_keys and not unexpected_keys:
-            print("✓ All keys loaded successfully")
-        else:
-            if missing_keys:
-                print(f"⚠ Missing keys: {len(missing_keys)}")
-            if unexpected_keys:
-                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
-    
+        msg = model.load_state_dict(state_dict, strict=False)
+        print(msg)    
     return model.to(device)
 
 
