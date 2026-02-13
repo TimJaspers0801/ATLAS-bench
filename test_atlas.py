@@ -683,7 +683,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--test_percentage",
         type=int,
-        default=10,
+        default=100,
         help="Percentage of test frames to evaluate (1-100)"
     )
     parser.add_argument(
