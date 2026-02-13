@@ -5,7 +5,12 @@ import numpy as np
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_classes=False):
+    """
+    Args:
+        remap_classes: If True, add 1 to all predictions (for models trained without background class).
+                      This remaps predictions back to original ATLAS class indices.
+    """
     model.eval()
 
     # Track scores per class across the entire dataset
@@ -26,6 +31,11 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
             outputs = model(images)
             probs = torch.softmax(outputs, dim=1)
             preds = torch.argmax(probs, dim=1, keepdim=True)
+            
+            # Remap classes if needed (e.g., for EOMT trained without background class)
+            if remap_classes:
+                preds = preds + 1  # Shift predictions: 0->1, 1->2, etc.
+            
             scores = probs.max(dim=1)[0].mean(dim=(1, 2))
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
