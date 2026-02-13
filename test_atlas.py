@@ -210,7 +210,7 @@ def load_eomt(checkpoint_path: str, num_classes: int, device: torch.device):
     from models.eomt.eomt import EOMT
     from models.decoders.vit import ViTSegmenter
     
-    vit_backbone = EOMT(
+    model = EOMT(
         img_size=256,
         patch_size=16,
         embed_dim=768,
@@ -219,11 +219,6 @@ def load_eomt(checkpoint_path: str, num_classes: int, device: torch.device):
         mlp_ratio=4.0,
     )
     
-    model = ViTSegmenter(
-        vit_model=vit_backbone,
-        decoder_name="linear",
-        num_classes=num_classes,
-    )
     
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading EOMT checkpoint: {checkpoint_path}")
@@ -249,94 +244,80 @@ def evaluate_videomt(model, test_loader, device, num_classes):
     current_clip = None
     ap_evaluator = None
     
-    with torch.no_grad():
-        current_video = None
+    def process_clip(clip_id, frames, gts):
+        nonlocal current_clip, ap_evaluator
 
-        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating VideoMT")):
+        if not frames:
+            return
+
+        frames_tensor = torch.stack(frames, dim=0).to(device)
+        outputs = model.process_video(frames_tensor, normalize=False, match_queries=True)
+
+        pred_logits = outputs['pred_logits'][0]  # (Q, C+1)
+        pred_masks = outputs['pred_masks'][0]    # (Q, T, H, W)
+
+        target_h, target_w = gts[0].shape[-2:]
+        if pred_masks.shape[-2:] != (target_h, target_w):
+            pred_masks = F.interpolate(
+                pred_masks,
+                size=(target_h, target_w),
+                mode='bilinear',
+                align_corners=False,
+            )
+
+        mask_cls = F.softmax(pred_logits, dim=-1)[:, :-1]  # (Q, C)
+        mask_pred = pred_masks.sigmoid()  # (Q, T, H, W)
+        semseg = torch.einsum("qc,qthw->cthw", mask_cls, mask_pred)
+        sem_score, sem_mask = semseg.max(0)  # (T, H, W)
+
+        if ap_evaluator is not None:
+            clip_ap[current_clip] = ap_evaluator.evaluate()
+        current_clip = clip_id
+        ap_evaluator = SegmentationAPEvaluator()
+
+        classes_to_eval = range(1, num_classes + 1)
+
+        for t in range(sem_mask.shape[0]):
+            pred_np = sem_mask[t].cpu().numpy()
+            gt_np = gts[t].squeeze().cpu().numpy()
+
+            gt_binary = (gt_np > 0).astype(np.uint8)
+            pred_binary = (pred_np > 0).astype(np.uint8)
+            max_score = sem_score[t].max().item()
+            ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
+
+            from evaluation.metrics import compute_class_metrics
+            for c in classes_to_eval:
+                iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
+                if iou_c is not None:
+                    class_ious[c].append(iou_c)
+                    class_dices[c].append(dice_c)
+
+    with torch.no_grad():
+        current_clip = None
+        clip_frames = []
+        clip_gts = []
+
+        for batch in tqdm(test_loader, desc="Evaluating VideoMT"):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
-            
-            # Check if we need to reset memory for a new video
-            batch_video = f"{batch['procedure'][0]}/{batch['video'][0]}"
-            if batch_video != current_video:
-                model.reset_memory()
-                current_video = batch_video
 
-            # Process frames online
-            B = images.shape[0]
-            outputs_list = []
-            
-            for i in range(B):
-                frame = images[i:i+1]  # (1, 3, H, W)
-                
-                # Online forward pass
-                output = model.forward_frame(frame)
-                outputs_list.append(output)
-                    
-            
-            # Combine outputs from batch
-            pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)  # (B, Q, C+1)
-            pred_masks = torch.cat([o['pred_masks'] for o in outputs_list], dim=0)      # (B, Q, H, W)
-            
-            # VSS Inference: Weight all query masks by their class probabilities
-            # Get class probabilities (exclude background/void class which is the last one)
-            mask_cls = F.softmax(pred_logits, dim=-1)[:, :, :-1]  # (B, Q, C)
-            
-            # Apply sigmoid to masks to convert logits to [0, 1]
-            pred_masks_prob = torch.sigmoid(pred_masks)  # (B, Q, H, W)
-            
-            # Use einsum to aggregate: weight each mask by class probability
-            # Result: for each class, compute weighted sum of all masks
-            # einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob) aggregates masks weighted by class confidence
-            semseg = torch.einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob)  # (B, C, H, W)
-            
-            # Take argmax over classes (dimension 1) to get predicted class for each pixel
-            sem_mask = semseg.argmax(dim=1)  # (B, H, W) - predicted class index (0 to C-1)
-            
-            for i in range(B):
-                # Get GT mask and ensure 2D shape
-                gt_mask = gt_masks[i].squeeze()  # Remove any extra dimensions
-                
-                # Get predicted segmentation (semantic mask)
-                pred_seg = sem_mask[i]  # (H, W) - class indices from 0 to C-1
-                
-                # Interpolate to GT size if needed
-                if pred_seg.shape != gt_mask.shape:
-                    pred_seg = pred_seg.unsqueeze(0).unsqueeze(0).float()  # (1, 1, H, W)
-                    pred_seg = F.interpolate(
-                        pred_seg,
-                        size=gt_mask.shape,
-                        mode='nearest'
-                    ).squeeze().long()  # (H, W)
-                
-                # Convert to numpy for metrics computation
-                pred_np = pred_seg.cpu().numpy()
-                gt_np = gt_mask.cpu().numpy()
-                
-                # AP Handling
+            for i in range(images.shape[0]):
                 clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
-                if current_clip != clip_id:
-                    if ap_evaluator is not None:
-                        clip_ap[current_clip] = ap_evaluator.evaluate()
+
+                if current_clip is None:
                     current_clip = clip_id
-                    ap_evaluator = SegmentationAPEvaluator()
-                
-                # Binary segmentation for AP: foreground vs background
-                gt_binary = (gt_np > 0).astype(np.uint8)
-                pred_binary = (pred_np > 0).astype(np.uint8)
-                
-                # Use max confidence from semseg for score
-                max_score = semseg[i].max().item()
-                ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
-                
-                # Compute per-class metrics
-                from evaluation.metrics import compute_class_metrics
-                classes_to_eval = range(1, num_classes+1)
-                for c in classes_to_eval:
-                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
-                    if iou_c is not None:
-                        class_ious[c].append(iou_c)
-                        class_dices[c].append(dice_c)
+
+                if clip_id != current_clip:
+                    process_clip(current_clip, clip_frames, clip_gts)
+                    clip_frames = []
+                    clip_gts = []
+                    current_clip = clip_id
+
+                clip_frames.append(images[i].cpu())
+                clip_gts.append(gt_masks[i].cpu())
+
+        process_clip(current_clip, clip_frames, clip_gts)
     
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
