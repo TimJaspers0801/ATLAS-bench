@@ -530,4 +530,10 @@ def eomt_vitb_dinov3(num_classes: int = 19, num_q: int = 5):
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
     return model
 
+def eomt_vitl_dinov3(num_classes: int = 19, num_q: int = 5):
+    from models.load_models import load_dinov3_l
+    encoder = load_dinov3_l()
+    model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(336,336))
+    return model
+
 

@@ -82,6 +82,9 @@ MODELS=(
     # "videomt|best_model.pth|videomt_atlas|1|1"
     # "videomt|best_model.pth|videomt_atlas|2|1"
     
+    # EOMT models
+    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
+    
     # Other models (commented out by default)
     "endofm|best_model.pth|endofm_atlas|0|32"
     "endovit|best_model.pth|endovit_atlas|0|32"

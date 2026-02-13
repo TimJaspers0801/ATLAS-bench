@@ -92,6 +92,7 @@ IMAGE_SIZE_MAP = {
     "dinov3": 256,
     "gastronet": 336,
     'videomt': 1280,
+    'eomt': 336,
 }
 
 
@@ -107,8 +108,8 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
     """Load a model from the registry with optional checkpoint."""
     if model_name == "videomt":
         return load_videomt(checkpoint_path, num_classes, device)
-    elif model_name == "eomt":
-        return load_eomt(checkpoint_path, num_classes, device)
+    elif model_name.startswith("eomt"):
+        return load_eomt(model_name, checkpoint_path, num_classes, device)
     elif model_name in MODEL_REGISTRY:
         # Load from registry
         loader = MODEL_REGISTRY[model_name]
@@ -124,7 +125,9 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
         raise ValueError(
             f"Unknown model: {model_name}. Available models:\n"
             f"  Image-based: {', '.join(MODEL_REGISTRY.keys())}\n"
-            f"  Video-based: videomt, eomt"
+            f"  Video-based: videomt\n"
+            f"  EOMT variants: eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2, "
+            f"eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3"
         )
 
 
@@ -193,20 +196,30 @@ def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
     return model.to(device)
 
 
-def load_eomt(checkpoint_path: str, num_classes: int, device: torch.device):
-    """Load EOMT model."""
-    from models.eomt.eomt import EOMT
-    from models.decoders.vit import ViTSegmenter
-    
-    model = EOMT(
-        img_size=256,
-        patch_size=16,
-        embed_dim=768,
-        depth=12,
-        num_heads=12,
-        mlp_ratio=4.0,
+def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
+    """Load EOMT model variants."""
+    from models.eomt.eomt import (
+        eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2,
+        eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3
     )
     
+    # Map model names to loader functions
+    eomt_loaders = {
+        "eomt_vits_dinov2": eomt_vits_dinov2,
+        "eomt_vitb_dinov2": eomt_vitb_dinov2,
+        "eomt_vitl_dinov2": eomt_vitl_dinov2,
+        "eomt_vits_dinov3": eomt_vits_dinov3,
+        "eomt_vitb_dinov3": eomt_vitb_dinov3,
+        "eomt_vitl_dinov3": eomt_vitl_dinov3,
+    }
+    
+    if model_name not in eomt_loaders:
+        raise ValueError(
+            f"Unknown EOMT variant: {model_name}. Available: {', '.join(eomt_loaders.keys())}"
+        )
+    
+    print(f"Loading EOMT model: {model_name}")
+    model = eomt_loaders[model_name](num_classes=num_classes)
     
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading EOMT checkpoint: {checkpoint_path}")
