@@ -109,6 +109,12 @@ class ViTBackbone(nn.Module):
         if self.is_native_dinov3:
             # Native DINOv3: Use custom forward pass
             features = self.backbone(x)
+            # GastroNet returns class logits (B, C) from forward(); use forward_features instead
+            if features.dim() == 2 and hasattr(self.backbone, "forward_features"):
+                features = self.backbone.forward_features(x)
+                if isinstance(features, dict) and "x_norm_patchtokens" in features:
+                    features = features["x_norm_patchtokens"]
+
             # Native DINOv3 returns (B, N, C) with prefix tokens already removed
             B, N, C = features.shape
             H = W = int(N ** 0.5)
