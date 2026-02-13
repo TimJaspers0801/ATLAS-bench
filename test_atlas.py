@@ -335,7 +335,7 @@ def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
 
                 from evaluation.metrics import compute_class_metrics
                 for c in classes_to_eval:
-                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
+                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c, ignore_index=255)
                     if iou_c is not None:
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
@@ -424,6 +424,7 @@ def save_random_visualizations(
     is_videomt,
     seed,
     remap_classes=False,
+    mask_background=False,
 ):
     if num_samples <= 0:
         return
@@ -494,6 +495,10 @@ def save_random_visualizations(
                 (gt_np.shape[1], gt_np.shape[0]),
                 interpolation=cv2.INTER_NEAREST
             ).astype(np.int32)
+        
+        # Mask background predictions if requested (makes visualization cleaner)
+        if mask_background:
+            pred_np[gt_np == 0] = 0
 
         gt_overlay = apply_mask_overlay(img_np, gt_np, color_palette)
         pred_overlay = apply_mask_overlay(img_np, pred_np, color_palette)
@@ -565,13 +570,20 @@ def main(args):
     elif args.model.startswith("eomt"):
         # EOMT models were trained without background class (0), all classes shifted down by 1
         # Need to remap predictions back to original ATLAS class indices
-        metrics = evaluate_model(model, test_loader, device, args.num_classes, remap_classes=True)
+        # Also ignore background pixels in evaluation (fair comparison - EOMT never learned background)
+        metrics = evaluate_model(model, test_loader, device, args.num_classes, 
+                                remap_classes=True, ignore_background=True)
     else:
-        metrics = evaluate_model(model, test_loader, device, args.num_classes)
+        # Other models were also trained ignoring background, but class mapping stays the same
+        # Ignore background pixels in evaluation for fair comparison
+        metrics = evaluate_model(model, test_loader, device, args.num_classes, 
+                                ignore_background=True)
 
     # Save visualizations
     if args.visualize_samples > 0:
         output_dir = os.path.join(args.visualize_dir, args.model)
+        # Determine if we should mask background (all models except VideoMT)
+        mask_bg = not (args.model == "videomt")
         save_random_visualizations(
             model=model,
             dataloader=test_loader,
@@ -582,6 +594,7 @@ def main(args):
             is_videomt=(args.model == "videomt"),
             seed=args.seed,
             remap_classes=args.model.startswith("eomt"),
+            mask_background=mask_bg,
         )
         print(f"\nSaved {args.visualize_samples} visualizations to: {output_dir}")
     

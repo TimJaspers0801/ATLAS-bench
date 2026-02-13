@@ -3,13 +3,18 @@ from pycocotools import mask as mask_utils
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
-def compute_class_metrics(pred, gt, class_id):
+def compute_class_metrics(pred, gt, class_id, ignore_index=255):
     """
     Computes IoU and Dice for a specific class ID in one image.
     Returns (iou, dice) or (None, None) if class not present in GT.
+    
+    Args:
+        ignore_index: Pixels with this value in GT are excluded from computation
     """
-    p = (pred == class_id)
-    g = (gt == class_id)
+    # Create masks excluding ignore_index
+    valid_mask = (gt != ignore_index)
+    p = (pred == class_id) & valid_mask
+    g = (gt == class_id) & valid_mask
 
     if not np.any(g):
         return None, None

@@ -5,13 +5,17 @@ import numpy as np
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_classes=False):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_classes=False, ignore_background=False):
     """
     Args:
         remap_classes: If True, add 1 to all predictions (for models trained without background class).
                       This remaps predictions back to original ATLAS class indices.
+        ignore_background: If True, mask out background pixels (GT==0) from evaluation.
+                          Fair for models that never learned background (e.g., EOMT).
     """
     model.eval()
+    
+    ignore_index = 255  # Standard ignore value used in Cityscapes and other datasets
 
     # Track scores per class across the entire dataset
     # format: {class_id: [score_img1, score_img2, ...]}
@@ -50,10 +54,18 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_
 
                 pred_np = preds[i, 0].cpu().numpy()
                 gt_np = gt_masks[i].cpu().numpy().squeeze()
+                
+                # Mask background pixels if requested (e.g., for EOMT)
+                # Set GT background pixels to ignore_index so they're excluded from metrics
+                if ignore_background:
+                    gt_np_masked = gt_np.copy()
+                    gt_np_masked[gt_np == 0] = ignore_index
+                else:
+                    gt_np_masked = gt_np
 
                 # --- Metric Collection (The part you wanted) ---
                 for c in classes_to_eval:
-                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c)
+                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np_masked, c, ignore_index=ignore_index)
 
                     if iou_c is not None:
                         class_ious[c].append(iou_c)
