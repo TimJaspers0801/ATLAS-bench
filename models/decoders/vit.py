@@ -13,19 +13,59 @@ class ViT(nn.Module):
         patch_size=16,
         ckpt_path: Optional[str] = None,
         backbone_name="vit_large_patch14_reg4_dinov2",
-        pixel_mean: Optional[list] = None,
-        pixel_std: Optional[list] = None,
     ):
         super().__init__()
 
         if "/" in backbone_name:
-            self.backbone = self.transformers_to_timm(
-                AutoModel.from_pretrained(
-                    backbone_name,
-                    token=True,
-                ),
-                img_size,
-            )
+            # Check if ckpt_path points to a .pth file (raw weights)
+            if ckpt_path and ckpt_path.endswith('.pth'):
+                # Create model from pretrained config (downloads config only)
+                hf_model = AutoModel.from_pretrained(backbone_name)
+                
+                # Load the custom weights
+                state_dict = torch.load(ckpt_path, map_location='cpu', weights_only=False)
+
+                # Handle different state dict formats
+                if 'state_dict' in state_dict:
+                    state_dict = state_dict['state_dict']
+                elif 'model' in state_dict:
+                    state_dict = state_dict['model']
+
+                # Fix key naming to match HuggingFace format
+                new_state_dict = {}
+                for key, value in state_dict.items():
+                    new_key = key
+                    
+                    # Remove 'backbone.' prefix if present
+                    if new_key.startswith('backbone.'):
+                        new_key = new_key.replace('backbone.', '', 1)
+                    
+                    # Rename to match HF naming convention
+                    new_key = new_key.replace('patch_embed.', 'embeddings.')
+                    new_key = new_key.replace('blocks.', 'layer.')
+                    
+                    # Skip pixel_mean and pixel_std (you register these separately)
+                    if new_key not in ['pixel_mean', 'pixel_std']:
+                        new_state_dict[new_key] = value
+                
+                # Load weights into the HF model
+                missing_keys, unexpected_keys = hf_model.load_state_dict(new_state_dict, strict=False)
+                
+                if missing_keys:
+                    print(f"[INFO] Missing keys when loading checkpoint: {missing_keys}")
+                if unexpected_keys:
+                    print(f"[INFO] Unexpected keys when loading checkpoint: {unexpected_keys}")
+
+                # Convert to timm format
+                self.backbone = self.transformers_to_timm(hf_model, img_size)
+            else:
+                # Original path: load from HF hub
+                self.backbone = self.transformers_to_timm(
+                    AutoModel.from_pretrained(
+                        backbone_name,
+                    ),
+                    img_size,
+                )
         else:
             self.backbone = timm.create_model(
                 backbone_name,
@@ -35,16 +75,28 @@ class ViT(nn.Module):
                 num_classes=0,
             )
 
-        if pixel_mean is None:
-            pixel_mean = [0.485, 0.456, 0.406]
-        if pixel_std is None:
-            pixel_std = [0.229, 0.224, 0.225]
+            self.backbone.patch_size = patch_size
+            self._orig_gil = self.backbone.get_intermediate_layers
+            self.backbone.get_intermediate_layers = self._get_intermediate_layers_timm
 
-        pixel_mean = torch.tensor(pixel_mean).reshape(1, -1, 1, 1)
-        pixel_std = torch.tensor(pixel_std).reshape(1, -1, 1, 1)
+        # --- Normalization buffers (conditional on checkpoint) ---
+        if ckpt_path is not None:
+            # Custom stats for checkpointed models (SurgeNet)
+            mean = [0.46888983, 0.29536288, 0.28712815]
+            std  = [0.24689102, 0.21034359, 0.21188641]
+        else:
+            # Default (ImageNet)
+            mean = [0.485, 0.456, 0.406]
+            std  = [0.229, 0.224, 0.225]
+            
+        pixel_mean = torch.tensor(mean, dtype=torch.float32).reshape(1, -1, 1, 1)
+        pixel_std  = torch.tensor(std,  dtype=torch.float32).reshape(1, -1, 1, 1)
 
         self.register_buffer("pixel_mean", pixel_mean)
         self.register_buffer("pixel_std", pixel_std)
+    
+    def _get_intermediate_layers_timm(self, x, n, **_):
+        return self._orig_gil(x, n, return_prefix_tokens=True)
 
     def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
         backbone.patch_embed = backbone.embeddings
@@ -52,134 +104,86 @@ class ViT(nn.Module):
             backbone.embeddings.config.patch_size,
             backbone.embeddings.config.patch_size,
         )
+        backbone.patch_size = backbone.embeddings.config.patch_size
         backbone.patch_embed.grid_size = (
             img_size[0] // backbone.embeddings.config.patch_size,
             img_size[1] // backbone.embeddings.config.patch_size,
         )
 
         backbone.embed_dim = backbone.embeddings.config.hidden_size
-        backbone.num_prefix_tokens = backbone.embeddings.config.num_register_tokens + 1
+        backbone.num_prefix_tokens = backbone.patch_embed.config.num_register_tokens + 1
         backbone.blocks = backbone.layer
-        
-        # Mark as converted HF model for detection in ViTBackbone
-        backbone.is_hf_converted = True
-        
-        # Add forward_features method for compatibility with ViTBackbone
-        def forward_features(x):
-            outputs = backbone(pixel_values=x)
-            return outputs.last_hidden_state
-        
-        backbone.forward_features = forward_features
+        backbone.get_intermediate_layers = self._get_intermediate_layers_hf
 
-        # Note: We do NOT delete embeddings or layer attributes because the
-        # HF model's forward method still needs them. The model works fine
-        # with both the timm-style attributes (patch_embed, blocks) and
-        # the HF-style attributes (embeddings, layer) present.
+        # Only delete mask_token, keep embeddings and layer for HF model compatibility
         try:
             del backbone.patch_embed.mask_token
         except AttributeError:
             pass
 
-        return backbone        
+        return backbone
+
+    def _get_intermediate_layers_hf(self, x, n, return_class_token=True, **kwargs):
+        out = self.backbone(pixel_values=x, output_hidden_states=True)
+        hidden = out.hidden_states
+        idxs = list(n)
+        picks = []
+        npt = self.backbone.num_prefix_tokens
+        for idx in idxs:
+            hs = hidden[idx]
+            cls_tok = hs[:, :1, :]
+            patch_tok = hs[:, npt:, :]
+            picks.append((patch_tok, cls_tok) if return_class_token else patch_tok)
+        return picks        
+
 
 
 class ViTBackbone(nn.Module):
     """
-    Simplified ViT backbone wrapper that uses timm's built-in methods.
-    For timm models, uses forward_features() which handles everything correctly.
-    For native DINOv3, uses custom forward pass.
+    ViT backbone wrapper that extracts patch features from the model.
+    Handles both timm and HuggingFace ViT models.
     """
     def __init__(self, vit_model):
         super().__init__()
         
-        # Determine model type
+        # Get the backbone (either from ViT wrapper or directly)
         if hasattr(vit_model, 'backbone'):
-            # ViT class wrapper (from models/decoders/vit.py ViT class)
             self.backbone = vit_model.backbone
-            self.is_vit_wrapper = True
         else:
-            # Direct model (timm or native DINOv3)
             self.backbone = vit_model
-            self.is_vit_wrapper = False
-        
-        # Check model type
-        self.is_native_dinov3 = hasattr(self.backbone, 'prepare_tokens_with_masks')
-        # Check for converted HF model (has marker attribute set in transformers_to_timm)
-        self.is_hf_converted = hasattr(self.backbone, 'is_hf_converted')
-        # HF model detection: has both embeddings and layer (transformers model, unconverted)
-        self.is_hf_model = hasattr(self.backbone, 'embeddings') and hasattr(self.backbone, 'layer')
         
         # Get model properties
-        if hasattr(self.backbone.patch_embed, 'patch_size'):
+        if hasattr(self.backbone, 'patch_embed'):
             patch_size = self.backbone.patch_embed.patch_size
             self.patch_size = patch_size[0] if isinstance(patch_size, tuple) else patch_size
+        elif hasattr(self.backbone, 'patch_size'):
+            self.patch_size = self.backbone.patch_size
         else:
             self.patch_size = 16  # default
             
         self.embed_dim = self.backbone.embed_dim
 
     def forward(self, x):
-        """Extract spatial features from ViT backbone."""
-        if self.is_native_dinov3:
-            # Native DINOv3: Use custom forward pass
-            features = self.backbone(x)
-            # GastroNet returns class logits (B, C) from forward(); use forward_features instead
-            if features.dim() == 2 and hasattr(self.backbone, "forward_features"):
-                features = self.backbone.forward_features(x)
-                if isinstance(features, dict) and "x_norm_patchtokens" in features:
-                    features = features["x_norm_patchtokens"]
-
-            # Native DINOv3 returns (B, N, C) with prefix tokens already removed
-            B, N, C = features.shape
-            H = W = int(N ** 0.5)
-            features = features.transpose(1, 2).reshape(B, C, H, W)
-            return features
-        elif self.is_hf_converted or self.is_hf_model:
-            # HuggingFace model (converted or unconverted): Use the backbone's forward method with pixel_values argument
-            outputs = self.backbone(pixel_values=x)
-            features = outputs.last_hidden_state  # (B, N, C) with prefix tokens
-            
-            # Remove prefix tokens (CLS + register tokens)
-            B, N, C = features.shape
-            num_prefix = getattr(self.backbone, 'num_prefix_tokens', 1)
-            if num_prefix > 0:
-                features = features[:, num_prefix:, :]
-            
-            # Reshape to spatial grid
-            B, N, C = features.shape
-            H = W = int(N ** 0.5)
-            features = features.transpose(1, 2).reshape(B, C, H, W)
-            return features
-        else:
-            # timm ViT or GastroNet: Use forward_features where available
-            features = self.backbone.forward_features(x)
-
-            # GastroNet forward_features returns a dict
-            if isinstance(features, dict):
-                if "x_norm_patchtokens" in features:
-                    features = features["x_norm_patchtokens"]
-                elif "x_prenorm" in features:
-                    # Drop prefix tokens from pre-norm tokens
-                    tokens = features["x_prenorm"]
-                    num_prefix = getattr(self.backbone, "num_register_tokens", 0) + 1
-                    features = tokens[:, num_prefix:, :]
-                else:
-                    raise ValueError("Unsupported GastroNet feature dict keys")
-
-            # forward_features returns (B, N, C) where N includes prefix tokens
-            B, N, C = features.shape
-
-            # Remove prefix tokens (CLS + register tokens)
-            num_prefix = getattr(self.backbone, 'num_prefix_tokens', 1)
-            if num_prefix > 0:
-                features = features[:, num_prefix:, :]
-
-            # Reshape to spatial grid
-            B, N, C = features.shape
-            H = W = int(N ** 0.5)
-            features = features.transpose(1, 2).reshape(B, C, H, W)
-
-            return features
+        """Extract spatial patch features from ViT backbone."""
+        # Use get_intermediate_layers to extract patch features from the last layer
+        # This works for both timm and HF models thanks to ViT's wrapping
+        intermediate = self.backbone.get_intermediate_layers(x, n=[11], return_class_token=False)
+        
+        # intermediate is a list of outputs from each requested layer
+        # For layer 11 (the last transformer layer), get the patch tokens
+        patch_tokens = intermediate[-1]  
+        
+        # patch_tokens should be (B, N, C) where N is number of patches
+        # If it's a tuple (patch_tok, cls_tok), take just the patches
+        if isinstance(patch_tokens, tuple):
+            patch_tokens = patch_tokens[0]
+        
+        # Reshape to spatial grid (B, N, C) -> (B, C, H, W)
+        B, N, C = patch_tokens.shape
+        H = W = int(N ** 0.5)
+        features = patch_tokens.transpose(1, 2).reshape(B, C, H, W)
+        
+        return features
 
 class ViTSegmenter(nn.Module):
     def __init__(
