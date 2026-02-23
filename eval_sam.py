@@ -168,11 +168,13 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     
     # Process all frames with prompts from the first frame
     with torch.no_grad():
-        # Input points: [image_level][object_level][point_level][coordinates]
-        # Note: For SAM2, we only provide clicks for the first frame
+        # Input points: for multiple frames, provide points for first frame and None for others
+        # Format per frame: [object_level][point_level][point_coordinates]
+        input_points_list = [objects_points] + [None] * (len(clip_frames) - 1)
+        
         inputs = processor(
             clip_frames,
-            input_points=[[objects_points]] + [None] * (len(clip_frames) - 1),  # Only clicks for first frame
+            input_points=input_points_list,  # Only clicks for first frame, None for others
             return_tensors="pt"
         ).to(device)
         
