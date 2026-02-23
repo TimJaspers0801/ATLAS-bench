@@ -41,7 +41,7 @@ cd ${PROJECT_ROOT} || exit 1
 
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 OUTPUT_PATH=/outputs
-IMG_SIZE=256
+IMG_SIZE=336
 EPOCHS=10
 BATCH_SIZE=32
 NUM_CLASSES=30
