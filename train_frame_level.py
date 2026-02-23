@@ -126,10 +126,10 @@ def train(args):
     print(f"Training on {len(train_dataset)} samples, Validation on {len(val_dataset)} samples. Testing on {len(test_dataset)}.")
 
     # Model
-    if 'vit' in args.model.lower() and args.model != 'endovit' and args.model != 'endofm':
-        base_lr = 1e-3
-        weight_decay = 0.05
-        llrd_factor = 0.8
+    # if 'vit' in args.model.lower() and args.model != 'endovit' and args.model != 'endofm':
+    #     base_lr = 1e-3
+    #     weight_decay = 0.05
+    #     llrd_factor = 0.8
 
     # simple linear head models
     if args.model == "lh-vit-s-dinov1":
@@ -193,23 +193,23 @@ def train(args):
     model.to(device)
 
     # Setup optimizer and criterion based on model type
-    if 'vit' in args.model.lower() and args.model != 'endovit':
-        from models.decoders.vit import get_param_groups_llrd_vit_segmenter
-        param_groups = get_param_groups_llrd_vit_segmenter(
-            model,
-            base_lr=args.lr,
-            weight_decay=weight_decay,
-            llrd_layer_decay=llrd_factor,
-        )
-        criterion = nn.CrossEntropyLoss(ignore_index=255)
-        optimizer = torch.optim.AdamW(param_groups, weight_decay=weight_decay)
-    elif args.model in ['endofm', 'endovit']:
-        # Standard optimization for EndoFM and EndoViT
-        criterion = nn.CrossEntropyLoss(ignore_index=255)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
-    else:
-        criterion = nn.CrossEntropyLoss(ignore_index=255)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    # if 'vit' in args.model.lower() and args.model != 'endovit':
+    #     from models.decoders.vit import get_param_groups_llrd_vit_segmenter
+    #     param_groups = get_param_groups_llrd_vit_segmenter(
+    #         model,
+    #         base_lr=args.lr,
+    #         weight_decay=weight_decay,
+    #         llrd_layer_decay=llrd_factor,
+    #     )
+    #     criterion = nn.CrossEntropyLoss(ignore_index=255)
+    #     optimizer = torch.optim.AdamW(param_groups, weight_decay=weight_decay)
+    # elif args.model in ['endofm', 'endovit']:
+    #     # Standard optimization for EndoFM and EndoViT
+    #     criterion = nn.CrossEntropyLoss(ignore_index=255)
+    #     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=0.01)
+    # else:
+    criterion = nn.CrossEntropyLoss(ignore_index=255)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
 
     learning_rate_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 
