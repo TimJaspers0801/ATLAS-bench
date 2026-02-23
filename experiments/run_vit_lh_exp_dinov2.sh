@@ -50,6 +50,40 @@ NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 SEEDS=(0)
 
+
+# ===========================
+# Experiment — LH DINOv2 - l
+# ===========================
+
+BATCH_SIZE=16
+WANDB_GROUP=lh_vitl_dinov2_atlas
+
+for SEED in "${SEEDS[@]}"; do
+  EXPERIMENT_NAME=lh_vitl_dinov2_atlas_seed${SEED}
+
+  echo "========================================"
+  echo "Running ${EXPERIMENT_NAME}"
+  echo "========================================"
+
+  srun apptainer exec --nv \
+    --bind ${PROJECT_ROOT}:/workspace \
+    --bind ${OUTPUT_ROOT_HOST}:/outputs \
+    ${CONTAINER} \
+    python3 /workspace/train_frame_level.py \
+      --data_path ${DATA_ZIP} \
+      --experiment_name ${EXPERIMENT_NAME} \
+      --model lh-vit-l-dinov2 \
+      --num_classes ${NUM_CLASSES} \
+      --epochs ${EPOCHS} \
+      --batch_size ${BATCH_SIZE} \
+      --img_size ${IMG_SIZE} \
+      --output_dir ${OUTPUT_PATH} \
+      --num_workers ${NUM_WORKERS} \
+      --seed ${SEED} \
+      --wandb_group ${WANDB_GROUP} \
+      --visualize
+done
+
 # ===========================
 # Experiment — LH DINOv2 - s
 # ===========================
@@ -118,38 +152,6 @@ for SEED in "${SEEDS[@]}"; do
       --visualize
 done
 
-# ===========================
-# Experiment — LH DINOv2 - l
-# ===========================
-
-BATCH_SIZE=16
-WANDB_GROUP=lh_vitl_dinov2_atlas
-
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=lh_vitl_dinov2_atlas_seed${SEED}
-
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
-
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model lh-vit-l-dinov2 \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --visualize
-done
 
 
 echo "========================================"
