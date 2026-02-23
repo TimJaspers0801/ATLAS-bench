@@ -71,12 +71,14 @@ class ViT(nn.Module):
         
         backbone.forward_features = forward_features
 
-        # Delete original HF attributes to keep only timm-style naming
-        del (
-            backbone.patch_embed.mask_token,
-            backbone.embeddings,
-            backbone.layer,
-        )
+        # Note: We do NOT delete embeddings or layer attributes because the
+        # HF model's forward method still needs them. The model works fine
+        # with both the timm-style attributes (patch_embed, blocks) and
+        # the HF-style attributes (embeddings, layer) present.
+        try:
+            del backbone.patch_embed.mask_token
+        except AttributeError:
+            pass
 
         return backbone        
 
