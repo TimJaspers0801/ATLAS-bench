@@ -267,7 +267,6 @@ def train(args):
             dataloader=val_loader,
             device=device,
             num_classes=args.num_classes,
-            ignore_background=False,
         )
 
         wandb.log({
@@ -339,7 +338,6 @@ def train(args):
         dataloader=val_loader,
         device=device,
         num_classes=args.num_classes,
-        ignore_background=False,
     )
     print("Evaluating on Test set...")
     test_metrics = evaluate_model(
@@ -347,7 +345,6 @@ def train(args):
         dataloader=test_loader,
         device=device,
         num_classes=args.num_classes,
-        ignore_background=False,
     )
     # Log final results
     wandb.log({
