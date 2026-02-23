@@ -126,7 +126,7 @@ def train(args):
         model = load_lh_vit_s_dinov1(n_classes=args.num_classes)
     elif args.model == "lh-vit-b-dinov1":
         model = load_lh_vit_b_dinov1(n_classes=args.num_classes)
-    if args.model == "lh-vit-s-dinov2":
+    elif args.model == "lh-vit-s-dinov2":
         model = load_lh_vit_s_dinov2(n_classes=args.num_classes)
     elif args.model == "lh-vit-b-dinov2":
         model = load_lh_vit_b_dinov2(n_classes=args.num_classes)
@@ -192,7 +192,7 @@ def train(args):
             llrd_layer_decay=llrd_factor,
         )
         criterion = nn.CrossEntropyLoss(ignore_index=255)
-        optimizer = torch.optim.AdamW(param_groups, lr=base_lr, weight_decay=weight_decay)
+        optimizer = torch.optim.AdamW(param_groups, weight_decay=weight_decay)
     elif args.model in ['endofm', 'endovit']:
         # Standard optimization for EndoFM and EndoViT
         criterion = nn.CrossEntropyLoss(ignore_index=255)
