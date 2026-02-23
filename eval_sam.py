@@ -149,34 +149,43 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     Returns:
         predictions: List of predicted masks (H, W) for each frame
     """
-    if not clip_frames or not class_clicks:
-        return [np.zeros((clip_frames[0].size[1], clip_frames[0].size[0]), dtype=np.int32) 
-                for _ in clip_frames]
+    if not clip_frames:
+        return []
+    
+    h, w = clip_frames[0].size[1], clip_frames[0].size[0]
+    
+    if not class_clicks:
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     predictions = []
     
     # Organize clicks by object (class) for proper 4-level nesting
-    # Format: [image_level][object_level][point_level][coordinates]
     objects_points = []  # Will contain one list of points per object/class
     class_id_list = []  # Track which class each object corresponds to
     
     for class_id, clicks in sorted(class_clicks.items()):
-        # Convert clicks to proper format: list of [x, y] pairs
-        points_for_object = [[x, y] for x, y in clicks]
-        objects_points.append(points_for_object)
-        class_id_list.append(class_id)
+        if clicks:  # Only add if there are actual clicks
+            # Convert clicks to proper format: list of [x, y] pairs
+            points_for_object = [[x, y] for x, y in clicks]
+            objects_points.append(points_for_object)
+            class_id_list.append(class_id)
+    
+    # If no valid points after filtering, return empty masks
+    if not objects_points:
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     # Process all frames with prompts from the first frame
-    with torch.no_grad():
-        # Input points: for multiple frames, provide points for first frame and None for others
-        # Format per frame: [object_level][point_level][point_coordinates]
-        input_points_list = [objects_points] + [None] * (len(clip_frames) - 1)
-        
-        inputs = processor(
-            clip_frames,
-            input_points=input_points_list,  # Only clicks for first frame, None for others
-            return_tensors="pt"
-        ).to(device)
+    try:
+        with torch.no_grad():
+            # Input points: for multiple frames, provide points for first frame and None for others
+            # Format per frame: [object_level][point_level][point_coordinates]
+            input_points_list = [objects_points] + [None] * (len(clip_frames) - 1)
+            
+            inputs = processor(
+                clip_frames,
+                input_points=input_points_list,  # Only clicks for first frame, None for others
+                return_tensors="pt"
+            ).to(device)
         
         outputs = model(**inputs)
         
@@ -187,7 +196,6 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             all_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
         else:
             # Fallback: create empty masks if output doesn't have proper mask output
-            h, w = clip_frames[0].size[1], clip_frames[0].size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
         # Handle different mask shapes
@@ -206,11 +214,9 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             all_masks = np.repeat(all_masks[np.newaxis, ...], len(clip_frames), axis=0)
         else:
             print(f"Error: Unexpected mask shape {all_masks.shape}")
-            h, w = clip_frames[0].size[1], clip_frames[0].size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
         # Process each frame's masks
-        h, w = clip_frames[0].size[1], clip_frames[0].size[0]
         for frame_idx in range(len(clip_frames)):
             if frame_idx < len(all_masks):
                 frame_masks = all_masks[frame_idx]  # (num_masks, H, W)
@@ -226,6 +232,11 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                     combined_mask[mask_binary > 0] = class_id
             
             predictions.append(combined_mask)
+    
+    except Exception as e:
+        print(f"Error processing clip with SAM2: {e}")
+        # Return empty masks for all frames if there's an error
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     return predictions
 
