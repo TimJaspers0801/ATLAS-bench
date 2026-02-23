@@ -155,9 +155,6 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     
     predictions = []
     
-    # Process first frame with clicks to initialize tracking
-    first_frame = clip_frames[0]
-    
     # Organize clicks by object (class) for proper 4-level nesting
     # Format: [image_level][object_level][point_level][coordinates]
     objects_points = []  # Will contain one list of points per object/class
@@ -169,71 +166,61 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
         objects_points.append(points_for_object)
         class_id_list.append(class_id)
     
-    # Initialize video state with first frame
+    # Process all frames with prompts from the first frame
     with torch.no_grad():
-        # Process first frame with prompts
         # Input points: [image_level][object_level][point_level][coordinates]
+        # Note: For SAM2, we only provide clicks for the first frame
         inputs = processor(
-            first_frame,
-            input_points=[objects_points],  # Wrap in image-level list
+            clip_frames,
+            input_points=[[objects_points]] + [None] * (len(clip_frames) - 1),  # Only clicks for first frame
             return_tensors="pt"
         ).to(device)
         
         outputs = model(**inputs)
         
-        # Get masks for first frame
-        # SAM outputs can have either pred_masks or mask_logits
+        # Get masks
         if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
-            masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (batch, num_masks, H, W)
-            if masks.ndim == 4:
-                masks = masks[0]  # Get first batch item -> (num_masks, H, W)
+            all_masks = outputs.pred_masks.sigmoid().cpu().numpy()
         elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-            masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (batch, num_masks, H, W) or similar
-            if masks.ndim == 4:
-                masks = masks[0]  # Get first batch item
+            all_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
         else:
             # Fallback: create empty masks if output doesn't have proper mask output
-            h, w = first_frame.size[1], first_frame.size[0]
+            h, w = clip_frames[0].size[1], clip_frames[0].size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
-        # Ensure masks is (num_masks, H, W)
-        if masks.ndim != 3:
-            print(f"Warning: Unexpected mask shape {masks.shape}")
-            h, w = first_frame.size[1], first_frame.size[0]
+        # Handle different mask shapes
+        # SAM2 might return (batch, num_frames, num_masks, H, W) or (batch, num_masks, H, W)
+        if all_masks.ndim == 5:
+            # (batch, num_frames, num_masks, H, W)
+            all_masks = all_masks[0]  # Remove batch dimension -> (num_frames, num_masks, H, W)
+        elif all_masks.ndim == 4:
+            # (batch, num_masks, H, W) - single frame or wrongly shaped
+            all_masks = all_masks[0]  # Remove batch dimension -> (num_masks, H, W)
+            # Expand to (num_frames, num_masks, H, W)
+            all_masks = np.repeat(all_masks[np.newaxis, ...], len(clip_frames), axis=0)
+        elif all_masks.ndim == 3:
+            # (num_masks, H, W) - single frame
+            # Expand to (num_frames, num_masks, H, W)
+            all_masks = np.repeat(all_masks[np.newaxis, ...], len(clip_frames), axis=0)
+        else:
+            print(f"Error: Unexpected mask shape {all_masks.shape}")
+            h, w = clip_frames[0].size[1], clip_frames[0].size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
-        # Combine masks based on class mapping
-        h, w = masks.shape[1:]
-        combined_mask = np.zeros((h, w), dtype=np.int32)
-        
-        for i, class_id in enumerate(class_id_list):
-            if i < len(masks):
-                mask_binary = (masks[i] > 0.5).astype(np.uint8)
-                combined_mask[mask_binary > 0] = class_id
-        
-        predictions.append(combined_mask)
-        
-        # Propagate through remaining frames
-        for frame in clip_frames[1:]:
-            inputs = processor(frame, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-            
-            if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
-                masks = outputs.pred_masks.sigmoid().cpu().numpy()  # Could be (batch, num_masks, H, W) or similar
-                if masks.ndim == 4:
-                    masks = masks[0]  # (num_masks, H, W)
-            elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-                masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
-                if masks.ndim == 4:
-                    masks = masks[0]  # (num_masks, H, W)
+        # Process each frame's masks
+        h, w = clip_frames[0].size[1], clip_frames[0].size[0]
+        for frame_idx in range(len(clip_frames)):
+            if frame_idx < len(all_masks):
+                frame_masks = all_masks[frame_idx]  # (num_masks, H, W)
             else:
-                masks = np.zeros((len(class_id_list), h, w))
+                frame_masks = np.zeros((len(class_id_list), h, w))
             
+            # Combine masks based on class mapping
             combined_mask = np.zeros((h, w), dtype=np.int32)
             
             for i, class_id in enumerate(class_id_list):
-                if i < len(masks):
-                    mask_binary = (masks[i] > 0.5).astype(np.uint8)
+                if i < len(frame_masks):
+                    mask_binary = (frame_masks[i] > 0.5).astype(np.uint8)
                     combined_mask[mask_binary > 0] = class_id
             
             predictions.append(combined_mask)
