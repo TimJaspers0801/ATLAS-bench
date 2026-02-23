@@ -158,33 +158,37 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     # Process first frame with clicks to initialize tracking
     first_frame = clip_frames[0]
     
-    # Combine all clicks and track which class each belongs to
-    all_clicks = []
-    click_to_class = []
+    # Organize clicks by object (class) for proper 4-level nesting
+    # Format: [image_level][object_level][point_level][coordinates]
+    objects_points = []  # Will contain one list of points per object/class
+    class_id_list = []  # Track which class each object corresponds to
     
-    for class_id, clicks in class_clicks.items():
-        all_clicks.extend(clicks)
-        click_to_class.extend([class_id] * len(clicks))
+    for class_id, clicks in sorted(class_clicks.items()):
+        # Convert clicks to proper format: list of [x, y] pairs
+        points_for_object = [[x, y] for x, y in clicks]
+        objects_points.append(points_for_object)
+        class_id_list.append(class_id)
     
     # Initialize video state with first frame
     with torch.no_grad():
         # Process first frame with prompts
+        # Input points: [image_level][object_level][point_level][coordinates]
         inputs = processor(
             first_frame,
-            input_points=[[all_clicks]],  # List of point prompts
+            input_points=[objects_points],  # Wrap in image-level list
             return_tensors="pt"
         ).to(device)
         
         outputs = model(**inputs)
         
         # Get masks for first frame
-        masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_queries, H, W)
+        masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_objects, H, W)
         
-        # Combine masks based on click-to-class mapping
+        # Combine masks based on class mapping
         h, w = masks.shape[1:]
         combined_mask = np.zeros((h, w), dtype=np.int32)
         
-        for i, class_id in enumerate(click_to_class):
+        for i, class_id in enumerate(class_id_list):
             if i < len(masks):
                 mask_binary = (masks[i] > 0.5).astype(np.uint8)
                 combined_mask[mask_binary > 0] = class_id
@@ -199,7 +203,7 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]
             combined_mask = np.zeros((h, w), dtype=np.int32)
             
-            for i, class_id in enumerate(click_to_class):
+            for i, class_id in enumerate(class_id_list):
                 if i < len(masks):
                     mask_binary = (masks[i] > 0.5).astype(np.uint8)
                     combined_mask[mask_binary > 0] = class_id
@@ -229,34 +233,38 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
     
     predictions = []
     
-    # Combine all clicks and track which class each belongs to
-    all_clicks = []
-    click_to_class = []
+    # Organize clicks by object (class) for proper 4-level nesting
+    # Format: [image_level][object_level][point_level][coordinates]
+    objects_points = []  # Will contain one list of points per object/class
+    class_id_list = []  # Track which class each object corresponds to
     
-    for class_id, clicks in class_clicks.items():
-        all_clicks.extend(clicks)
-        click_to_class.extend([class_id] * len(clicks))
+    for class_id, clicks in sorted(class_clicks.items()):
+        # Convert clicks to proper format: list of [x, y] pairs
+        points_for_object = [[x, y] for x, y in clicks]
+        objects_points.append(points_for_object)
+        class_id_list.append(class_id)
     
     with torch.no_grad():
         # SAM3 processes video frames together
         # Prepare inputs for video propagation
+        # Input points: [image_level][object_level][point_level][coordinates]
         inputs = processor(
             images=clip_frames,
-            input_points=[[all_clicks]],
+            input_points=[objects_points],  # Wrap in image-level list
             return_tensors="pt"
         ).to(device)
         
         outputs = model(**inputs)
         
         # Get predicted masks for all frames
-        pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_queries, H, W)
+        pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_objects, H, W)
         
         for frame_idx in range(len(clip_frames)):
-            masks = pred_masks[frame_idx]  # (num_queries, H, W)
+            masks = pred_masks[frame_idx]  # (num_objects, H, W)
             h, w = masks.shape[1:]
             combined_mask = np.zeros((h, w), dtype=np.int32)
             
-            for i, class_id in enumerate(click_to_class):
+            for i, class_id in enumerate(class_id_list):
                 if i < len(masks):
                     mask_binary = (masks[i] > 0.5).astype(np.uint8)
                     combined_mask[mask_binary > 0] = class_id
