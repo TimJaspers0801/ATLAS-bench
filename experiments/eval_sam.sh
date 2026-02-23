@@ -10,6 +10,9 @@
 # Environment info
 # ===========================
 
+export HF_TOKEN=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
+
+
 echo "========================================"
 echo "Evaluating SAM models on $(hostname)"
 echo "Job ID: ${SLURM_JOB_ID}"

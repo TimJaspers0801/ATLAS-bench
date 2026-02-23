@@ -185,12 +185,20 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
         # SAM outputs can have either pred_masks or mask_logits
         if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
             masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (batch, num_masks, H, W)
-            masks = masks[0]  # Get first batch item
+            if masks.ndim == 4:
+                masks = masks[0]  # Get first batch item -> (num_masks, H, W)
         elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-            masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (batch, num_masks, H, W)
-            masks = masks[0]  # Get first batch item
+            masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (batch, num_masks, H, W) or similar
+            if masks.ndim == 4:
+                masks = masks[0]  # Get first batch item
         else:
             # Fallback: create empty masks if output doesn't have proper mask output
+            h, w = first_frame.size[1], first_frame.size[0]
+            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
+        
+        # Ensure masks is (num_masks, H, W)
+        if masks.ndim != 3:
+            print(f"Warning: Unexpected mask shape {masks.shape}")
             h, w = first_frame.size[1], first_frame.size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
@@ -211,9 +219,13 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             outputs = model(**inputs)
             
             if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
-                masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_masks, H, W)
+                masks = outputs.pred_masks.sigmoid().cpu().numpy()  # Could be (batch, num_masks, H, W) or similar
+                if masks.ndim == 4:
+                    masks = masks[0]  # (num_masks, H, W)
             elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-                masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()[0]  # (num_masks, H, W)
+                masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
+                if masks.ndim == 4:
+                    masks = masks[0]  # (num_masks, H, W)
             else:
                 masks = np.zeros((len(class_id_list), h, w))
             
@@ -274,11 +286,24 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
         
         # Get predicted masks for all frames
         if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
-            pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_objects, H, W)
+            pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # Could be (B, num_objects, H, W) or similar
         elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-            pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (B, num_objects, H, W)
+            pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # Could be (B, num_objects, H, W) or similar
         else:
             # Fallback: create empty predictions
+            h = clip_frames[0].size[1]
+            w = clip_frames[0].size[0]
+            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
+        
+        # Handle different mask shapes
+        if pred_masks.ndim == 4:
+            # (B, num_objects, H, W) - normal case
+            num_frames = pred_masks.shape[0]
+        elif pred_masks.ndim == 3:
+            # (num_objects, H, W) - might be single frame or different format
+            num_frames = 1
+            pred_masks = pred_masks[np.newaxis, ...]  # Add batch dimension
+        else:
             h = clip_frames[0].size[1]
             w = clip_frames[0].size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
