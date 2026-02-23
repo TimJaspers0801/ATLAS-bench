@@ -577,7 +577,7 @@ def main(args):
         # Other models were also trained ignoring background, but class mapping stays the same
         # Ignore background pixels in evaluation for fair comparison
         metrics = evaluate_model(model, test_loader, device, args.num_classes, 
-                                ignore_background=True)
+                                remap_classes=True, ignore_background=True)
 
     # Save visualizations
     if args.visualize_samples > 0:

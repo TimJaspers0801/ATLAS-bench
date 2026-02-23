@@ -48,7 +48,7 @@ EPOCHS=10
 NUM_CLASSES=30
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
-SEEDS=(0 1 2)
+SEEDS=(0)
 
 # ===========================
 # Experiment — LH DINOv2 - s
