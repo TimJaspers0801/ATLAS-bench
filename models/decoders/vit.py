@@ -60,6 +60,16 @@ class ViT(nn.Module):
         backbone.embed_dim = backbone.embeddings.config.hidden_size
         backbone.num_prefix_tokens = backbone.embeddings.config.num_register_tokens + 1
         backbone.blocks = backbone.layer
+        
+        # Mark as converted HF model for detection in ViTBackbone
+        backbone.is_hf_converted = True
+        
+        # Add forward_features method for compatibility with ViTBackbone
+        def forward_features(x):
+            outputs = backbone(pixel_values=x)
+            return outputs.last_hidden_state
+        
+        backbone.forward_features = forward_features
 
         # Delete original HF attributes to keep only timm-style naming
         del (
@@ -92,7 +102,9 @@ class ViTBackbone(nn.Module):
         
         # Check model type
         self.is_native_dinov3 = hasattr(self.backbone, 'prepare_tokens_with_masks')
-        # HF model detection: has both embeddings and layer (transformers model)
+        # Check for converted HF model (has marker attribute set in transformers_to_timm)
+        self.is_hf_converted = hasattr(self.backbone, 'is_hf_converted')
+        # HF model detection: has both embeddings and layer (transformers model, unconverted)
         self.is_hf_model = hasattr(self.backbone, 'embeddings') and hasattr(self.backbone, 'layer')
         
         # Get model properties
@@ -120,8 +132,8 @@ class ViTBackbone(nn.Module):
             H = W = int(N ** 0.5)
             features = features.transpose(1, 2).reshape(B, C, H, W)
             return features
-        elif self.is_hf_model:
-            # HuggingFace model: Use the backbone's forward method with pixel_values argument
+        elif self.is_hf_converted or self.is_hf_model:
+            # HuggingFace model (converted or unconverted): Use the backbone's forward method with pixel_values argument
             outputs = self.backbone(pixel_values=x)
             features = outputs.last_hidden_state  # (B, N, C) with prefix tokens
             
