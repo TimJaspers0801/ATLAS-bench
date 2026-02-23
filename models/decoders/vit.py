@@ -1,4 +1,5 @@
 from typing import Optional
+import inspect
 import timm
 import torch
 import torch.nn as nn
@@ -159,9 +160,21 @@ class ViTBackbone(nn.Module):
                 self.get_intermediate_layers_fn = lambda x, n: vit_model._get_intermediate_layers_timm(x, n, return_prefix_tokens=False)
                 self.is_hf_model = False
             else:
-                # Direct timm model
-                self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
-                self.is_hf_model = False
+                # Direct model (could be timm or GastroNet/DINO)
+                # Check the method signature to determine the correct parameter name
+                sig = inspect.signature(self.backbone.get_intermediate_layers)
+                if 'return_prefix_tokens' in sig.parameters:
+                    # timm model
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
+                    self.is_hf_model = False
+                elif 'return_class_token' in sig.parameters:
+                    # GastroNet (DINO) model
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_class_token=False)
+                    self.is_hf_model = False
+                else:
+                    # Fallback: call without any prefix parameter
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n)
+                    self.is_hf_model = False
         else:
             self.backbone = vit_model
             # Check if it's an HF model (has embeddings and layer attributes)
@@ -169,9 +182,20 @@ class ViTBackbone(nn.Module):
                 self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_class_token=False)
                 self.is_hf_model = True
             else:
-                # timm model
-                self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
-                self.is_hf_model = False
+                # Check the method signature to determine the correct parameter name
+                sig = inspect.signature(self.backbone.get_intermediate_layers)
+                if 'return_prefix_tokens' in sig.parameters:
+                    # timm model
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
+                    self.is_hf_model = False
+                elif 'return_class_token' in sig.parameters:
+                    # GastroNet (DINO) model
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_class_token=False)
+                    self.is_hf_model = False
+                else:
+                    # Fallback: call without any prefix parameter
+                    self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n)
+                    self.is_hf_model = False
         
         # Get model properties
         if hasattr(self.backbone, 'patch_embed'):

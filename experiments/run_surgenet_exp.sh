@@ -51,37 +51,37 @@ NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 SEEDS=(0)
 
-# ===========================
-# Experiment — pvtv2 surgenet
-# ===========================
+# # ===========================
+# # Experiment — pvtv2 surgenet
+# # ===========================
 
-WANDB_GROUP=pvtv2_atlas
+# WANDB_GROUP=pvtv2_atlas
 
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=pvtv2_atlas_seed${SEED}
+# for SEED in "${SEEDS[@]}"; do
+#   EXPERIMENT_NAME=pvtv2_atlas_seed${SEED}
 
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
+#   echo "========================================"
+#   echo "Running ${EXPERIMENT_NAME}"
+#   echo "========================================"
 
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model pvtv2 \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --visualize
-done
+#   srun apptainer exec --nv \
+#     --bind ${PROJECT_ROOT}:/workspace \
+#     --bind ${OUTPUT_ROOT_HOST}:/outputs \
+#     ${CONTAINER} \
+#     python3 /workspace/train_frame_level.py \
+#       --data_path ${DATA_ZIP} \
+#       --experiment_name ${EXPERIMENT_NAME} \
+#       --model pvtv2 \
+#       --num_classes ${NUM_CLASSES} \
+#       --epochs ${EPOCHS} \
+#       --batch_size ${BATCH_SIZE} \
+#       --img_size ${IMG_SIZE} \
+#       --output_dir ${OUTPUT_PATH} \
+#       --num_workers ${NUM_WORKERS} \
+#       --seed ${SEED} \
+#       --wandb_group ${WANDB_GROUP} \
+#       --visualize
+# done
 
 
 # ===========================
