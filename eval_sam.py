@@ -51,13 +51,13 @@ SAM3_MODELS = {
 
 def load_sam2_model(model_name: str, device: torch.device):
     """Load SAM2 model from HuggingFace."""
-    from transformers import Sam2Processor, Sam2ImageSegmentationModel
+    from transformers import AutoProcessor, AutoModelForMaskGeneration
     
     model_id = SAM2_MODELS[model_name]
     print(f"Loading SAM2 model: {model_id}")
     
-    processor = Sam2Processor.from_pretrained(model_id)
-    model = Sam2ImageSegmentationModel.from_pretrained(model_id).to(device)
+    processor = AutoProcessor.from_pretrained(model_id)
+    model = AutoModelForMaskGeneration.from_pretrained(model_id).to(device)
     model.eval()
     
     return model, processor
@@ -65,13 +65,13 @@ def load_sam2_model(model_name: str, device: torch.device):
 
 def load_sam3_model(model_name: str, device: torch.device):
     """Load SAM3 model from HuggingFace."""
-    from transformers import Sam3Processor, Sam3ForUniversalSegmentation
+    from transformers import AutoProcessor, AutoModelForMaskGeneration
     
     model_id = SAM3_MODELS[model_name]
     print(f"Loading SAM3 model: {model_id}")
     
-    processor = Sam3Processor.from_pretrained(model_id)
-    model = Sam3ForUniversalSegmentation.from_pretrained(model_id).to(device)
+    processor = AutoProcessor.from_pretrained(model_id)
+    model = AutoModelForMaskGeneration.from_pretrained(model_id).to(device)
     model.eval()
     
     return model, processor
@@ -182,12 +182,15 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
         outputs = model(**inputs)
         
         # Get masks for first frame
-        # SAM2 outputs masks with shape (batch_size, num_masks, H, W)
-        if hasattr(outputs, 'pred_masks'):
+        # SAM outputs can have either pred_masks or mask_logits
+        if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
             masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (batch, num_masks, H, W)
             masks = masks[0]  # Get first batch item
+        elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
+            masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (batch, num_masks, H, W)
+            masks = masks[0]  # Get first batch item
         else:
-            # Fallback: create empty masks if output doesn't have pred_masks
+            # Fallback: create empty masks if output doesn't have proper mask output
             h, w = first_frame.size[1], first_frame.size[0]
             return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
@@ -207,8 +210,10 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             inputs = processor(frame, return_tensors="pt").to(device)
             outputs = model(**inputs)
             
-            if hasattr(outputs, 'pred_masks'):
+            if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
                 masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_masks, H, W)
+            elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
+                masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()[0]  # (num_masks, H, W)
             else:
                 masks = np.zeros((len(class_id_list), h, w))
             
@@ -268,8 +273,10 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
         outputs = model(**inputs)
         
         # Get predicted masks for all frames
-        if hasattr(outputs, 'pred_masks'):
+        if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
             pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_objects, H, W)
+        elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
+            pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # (B, num_objects, H, W)
         else:
             # Fallback: create empty predictions
             h = clip_frames[0].size[1]
