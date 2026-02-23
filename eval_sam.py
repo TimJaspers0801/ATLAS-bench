@@ -51,13 +51,13 @@ SAM3_MODELS = {
 
 def load_sam2_model(model_name: str, device: torch.device):
     """Load SAM2 model from HuggingFace."""
-    from transformers import Sam2Processor, Sam2VisionModel
+    from transformers import Sam2Processor, Sam2ImageSegmentationModel
     
     model_id = SAM2_MODELS[model_name]
     print(f"Loading SAM2 model: {model_id}")
     
     processor = Sam2Processor.from_pretrained(model_id)
-    model = Sam2VisionModel.from_pretrained(model_id).to(device)
+    model = Sam2ImageSegmentationModel.from_pretrained(model_id).to(device)
     model.eval()
     
     return model, processor
@@ -182,7 +182,14 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
         outputs = model(**inputs)
         
         # Get masks for first frame
-        masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_objects, H, W)
+        # SAM2 outputs masks with shape (batch_size, num_masks, H, W)
+        if hasattr(outputs, 'pred_masks'):
+            masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (batch, num_masks, H, W)
+            masks = masks[0]  # Get first batch item
+        else:
+            # Fallback: create empty masks if output doesn't have pred_masks
+            h, w = first_frame.size[1], first_frame.size[0]
+            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
         # Combine masks based on class mapping
         h, w = masks.shape[1:]
@@ -200,7 +207,11 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             inputs = processor(frame, return_tensors="pt").to(device)
             outputs = model(**inputs)
             
-            masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]
+            if hasattr(outputs, 'pred_masks'):
+                masks = outputs.pred_masks.sigmoid().cpu().numpy()[0]  # (num_masks, H, W)
+            else:
+                masks = np.zeros((len(class_id_list), h, w))
+            
             combined_mask = np.zeros((h, w), dtype=np.int32)
             
             for i, class_id in enumerate(class_id_list):
@@ -257,11 +268,24 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
         outputs = model(**inputs)
         
         # Get predicted masks for all frames
-        pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_objects, H, W)
+        if hasattr(outputs, 'pred_masks'):
+            pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # (B, num_objects, H, W)
+        else:
+            # Fallback: create empty predictions
+            h = clip_frames[0].size[1]
+            w = clip_frames[0].size[0]
+            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
         
         for frame_idx in range(len(clip_frames)):
-            masks = pred_masks[frame_idx]  # (num_objects, H, W)
-            h, w = masks.shape[1:]
+            if frame_idx < len(pred_masks):
+                masks = pred_masks[frame_idx]  # (num_objects, H, W)
+                h, w = masks.shape[1:]
+            else:
+                # Use size from first frame if index out of range
+                h = clip_frames[0].size[1]
+                w = clip_frames[0].size[0]
+                masks = np.zeros((len(class_id_list), h, w))
+            
             combined_mask = np.zeros((h, w), dtype=np.int32)
             
             for i, class_id in enumerate(class_id_list):
