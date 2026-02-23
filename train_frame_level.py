@@ -117,7 +117,7 @@ def train(args):
 
     # Model
     if 'vit' in args.model.lower() and args.model != 'endovit' and args.model != 'endofm':
-        base_lr = 1e-4
+        base_lr = 1e-3
         weight_decay = 0.05
         llrd_factor = 0.8
 
