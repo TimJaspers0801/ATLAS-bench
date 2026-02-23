@@ -630,6 +630,7 @@ def main(args):
         transform=test_transform,
         frame_percentage=args.test_percentage,
         seed=args.seed,
+        normalization_type="none",
     )
     
     test_loader = DataLoader(

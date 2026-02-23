@@ -61,6 +61,13 @@ def train(args):
         T.CenterCrop(args.img_size),
     ])
 
+    # Determine normalization type based on model
+    # DINO models (v1, v2, v3) use ImageNet normalization
+    # Other models use no normalization by default (they have their own)
+    if any(x in args.model.lower() for x in ['dinov1', 'dinov2', 'dinov3', 'vit']):
+        normalization_type = "imagenet"
+    else:
+        normalization_type = "none"
 
     # Create datasets and loaders
     train_dataset = AtlasDataset(
@@ -70,6 +77,7 @@ def train(args):
         first_frame_only=args.first_frame_only,
         frame_percentage=args.frame_percentage,
         seed=args.seed,
+        normalization_type=normalization_type,
     )
 
     val_dataset = AtlasDataset(
@@ -77,6 +85,7 @@ def train(args):
         split="val",
         transform=val_transform,
         seed=args.seed,
+        normalization_type=normalization_type,
     )
 
     test_dataset = AtlasDataset(
@@ -84,6 +93,7 @@ def train(args):
         split="test",
         transform=val_transform,
         seed=args.seed,
+        normalization_type=normalization_type,
     )
 
     train_loader = DataLoader(

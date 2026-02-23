@@ -526,12 +526,20 @@ def main(args):
         T.CenterCrop(img_size),
     ])
     
+    # Determine normalization type based on model
+    # DINO models (v1, v2, v3) use ImageNet normalization
+    if any(x in args.model.lower() for x in ['dinov1', 'dinov2', 'dinov3', 'vit']):
+        normalization_type = "imagenet"
+    else:
+        normalization_type = "none"
+    
     test_dataset = AtlasDataset(
         zip_path=args.data_path,
         split="test",
         transform=test_transform,
         frame_percentage=args.test_percentage,
         seed=args.seed,
+        normalization_type=normalization_type,
     )
     
     test_loader = DataLoader(

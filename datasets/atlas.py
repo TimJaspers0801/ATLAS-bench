@@ -29,8 +29,10 @@ class AtlasDataset(Dataset):
         first_frame_only=False,
         frame_percentage=100,
         seed=42,
+        normalization_type="none",
     ):
         assert split in {"train", "val", "test"}
+        assert normalization_type in {"none", "surgical", "imagenet"}
 
         if not (1 <= frame_percentage <= 100):
             raise ValueError("frame_percentage must be between 1 and 100")
@@ -43,11 +45,26 @@ class AtlasDataset(Dataset):
         self.one_sample_per_clip = one_sample_per_clip
         self.first_frame_only = first_frame_only
         self.frame_percentage = frame_percentage
+        self.normalization_type = normalization_type
         self._rng = random.Random(seed)
 
-        # --------------------------------------------------
-        # Auto-detect root folder if not provided
-        # --------------------------------------------------
+        # Normalization statistics
+        if normalization_type == "surgical":
+            # Surgical video dataset specific normalization
+            self.norm_mean = [0.46888983, 0.29536288, 0.28712815]
+            self.norm_std = [0.24689102, 0.21034359, 0.21188641]
+        elif normalization_type == "imagenet":
+            # ImageNet normalization for pretrained ViT models (DINOv1/v2/v3)
+            self.norm_mean = [0.485, 0.456, 0.406]
+            self.norm_std = [0.229, 0.224, 0.225]
+        else:
+            # No normalization
+            self.norm_mean = None
+            self.norm_std = None
+
+        # Keep original dataset stats for backward compatibility
+        self.mean = [0.46888983, 0.29536288, 0.28712815]
+        self.std = [0.24689102, 0.21034359, 0.21188641]
         with zipfile.ZipFile(self.zip_path, "r") as zf:
             all_files = [p.lstrip("./") for p in zf.namelist() if not p.endswith("/")]
             top_level = {p.split("/")[0] for p in all_files if p.count("/") > 0}
@@ -187,8 +204,9 @@ class AtlasDataset(Dataset):
         # The 'scale=True' is the critical missing piece!
         image = T.functional.to_dtype(image, dtype=torch.float32, scale=True)
 
-        # 4. Normalize (now that values are 0-1)
-        image = T.functional.normalize(image, mean=self.mean, std=self.std)
+        # 4. Apply normalization if specified
+        if self.norm_mean is not None and self.norm_std is not None:
+            image = T.functional.normalize(image, mean=self.norm_mean, std=self.norm_std)
 
         return {
             "image": image,
