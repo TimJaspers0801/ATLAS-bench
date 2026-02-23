@@ -5,13 +5,14 @@ import numpy as np
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
 
 
-def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_classes=False, ignore_background=False):
+def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
     """
     Args:
-        remap_classes: If True, add 1 to all predictions (for models trained without background class).
-                      This remaps predictions back to original ATLAS class indices.
-        ignore_background: If True, mask out background pixels (GT==0) from evaluation.
-                          Fair for models that never learned background (e.g., EOMT).
+        model: The model to evaluate.
+        dataloader: The dataloader for evaluation.
+        device: Device to use (cuda or cpu).
+        num_classes: Number of classes.
+        threshold: Threshold for binary decisions.
     """
     model.eval()
     
@@ -36,10 +37,6 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_
             probs = torch.softmax(outputs, dim=1)
             preds = torch.argmax(probs, dim=1, keepdim=True)
             
-            # Remap classes if needed (e.g., for EOMT trained without background class)
-            if remap_classes:
-                preds = preds + 1  # Shift predictions: 0->1, 1->2, etc.
-            
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
             for i in range(len(images)):
@@ -54,13 +51,7 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_
                 pred_np = preds[i, 0].cpu().numpy()
                 gt_np = gt_masks[i].cpu().numpy().squeeze()
                 
-                # Mask background pixels if requested (e.g., for EOMT)
-                # Set GT background pixels to ignore_index so they're excluded from metrics
-                if ignore_background:
-                    gt_np_masked = gt_np.copy()
-                    gt_np_masked[gt_np == 0] = ignore_index
-                else:
-                    gt_np_masked = gt_np
+                gt_np_masked = gt_np
 
                 # --- Metric Collection (The part you wanted) ---
                 for c in classes_to_eval:

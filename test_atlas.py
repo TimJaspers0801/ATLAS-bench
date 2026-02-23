@@ -423,7 +423,6 @@ def save_random_visualizations(
     img_size,
     is_videomt,
     seed,
-    remap_classes=False,
     mask_background=False,
 ):
     if num_samples <= 0:
@@ -470,10 +469,6 @@ def save_random_visualizations(
                 outputs = model(images)
                 probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1)
-                
-                # Remap classes if needed (e.g., for EOMT trained without background class)
-                if remap_classes:
-                    preds = preds + 1  # Shift predictions: 0->1, 1->2, etc.
 
             for i in range(images.shape[0]):
                 seen += 1
@@ -569,15 +564,10 @@ def main(args):
         )
     elif args.model.startswith("eomt"):
         # EOMT models were trained without background class (0), all classes shifted down by 1
-        # Need to remap predictions back to original ATLAS class indices
-        # Also ignore background pixels in evaluation (fair comparison - EOMT never learned background)
-        metrics = evaluate_model(model, test_loader, device, args.num_classes, 
-                                remap_classes=True, ignore_background=True)
+        metrics = evaluate_model(model, test_loader, device, args.num_classes)
     else:
-        # Other models were also trained ignoring background, but class mapping stays the same
-        # Ignore background pixels in evaluation for fair comparison
-        metrics = evaluate_model(model, test_loader, device, args.num_classes, 
-                                remap_classes=True, ignore_background=True)
+        # Other models were also trained ignoring background
+        metrics = evaluate_model(model, test_loader, device, args.num_classes)
 
     # Save visualizations
     if args.visualize_samples > 0:
@@ -593,7 +583,6 @@ def main(args):
             img_size=img_size,
             is_videomt=(args.model == "videomt"),
             seed=args.seed,
-            remap_classes=args.model.startswith("eomt"),
             mask_background=mask_bg,
         )
         print(f"\nSaved {args.visualize_samples} visualizations to: {output_dir}")
