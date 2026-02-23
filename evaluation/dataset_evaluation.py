@@ -40,7 +40,6 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_
             if remap_classes:
                 preds = preds + 1  # Shift predictions: 0->1, 1->2, etc.
             
-            scores = probs.max(dim=1)[0].mean(dim=(1, 2))
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
             for i in range(len(images)):
@@ -71,10 +70,21 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5, remap_
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
 
-                # Binary AP logic
+                # Binary AP logic with improved confidence scoring
                 gt_binary = (gt_np > 0).astype(np.uint8)
                 pred_binary = (pred_np > 0).astype(np.uint8)
-                ap_evaluator.add_frame(gt_binary, pred_binary, scores[i].item())
+                
+                # Compute per-frame confidence score: average probability of predicted class in predicted mask
+                pred_class_probs = probs[i, preds[i, 0]]  # Get prob of predicted class for each pixel
+                pred_mask = (pred_np > 0)  # Mask of non-background predictions
+                
+                if pred_mask.sum() > 0:
+                    score = pred_class_probs[pred_mask].mean().item()
+                else:
+                    # If no mask predicted, use max probability as fallback
+                    score = probs[i].max().item()
+                
+                ap_evaluator.add_frame(gt_binary, pred_binary, score)
 
         if ap_evaluator is not None:
             clip_ap[current_clip] = ap_evaluator.evaluate()
