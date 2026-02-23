@@ -66,14 +66,17 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
                 pred_binary = (pred_np > 0).astype(np.uint8)
                 
                 # Compute per-frame confidence score: average probability of predicted class in predicted mask
-                pred_class_probs = probs[i, preds[i, 0]]  # Get prob of predicted class for each pixel
+                # Move to CPU to avoid large GPU tensor allocation
+                probs_np = probs[i].cpu().numpy()  # Shape: (num_classes, H, W)
+                pred_class = preds[i, 0].cpu().item()  # Get the predicted class index
+                pred_class_probs = probs_np[pred_class]  # Shape: (H, W)
                 pred_mask = (pred_np > 0)  # Mask of non-background predictions
                 
                 if pred_mask.sum() > 0:
-                    score = pred_class_probs[pred_mask].mean().item()
+                    score = pred_class_probs[pred_mask].mean()
                 else:
                     # If no mask predicted, use max probability as fallback
-                    score = probs[i].max().item()
+                    score = probs_np.max()
                 
                 ap_evaluator.add_frame(gt_binary, pred_binary, score)
 
