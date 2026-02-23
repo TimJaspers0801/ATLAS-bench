@@ -48,6 +48,7 @@ EPOCHS=2
 NUM_CLASSES=30
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
+LR = 1e-6
 SEEDS=(0)
 
 
@@ -83,6 +84,7 @@ for SEED in "${SEEDS[@]}"; do
       --num_workers ${NUM_WORKERS} \
       --seed ${SEED} \
       --wandb_group ${WANDB_GROUP} \
+      --lr ${LR} \
       --visualize
 done
 
@@ -118,6 +120,7 @@ for SEED in "${SEEDS[@]}"; do
       --num_workers ${NUM_WORKERS} \
       --seed ${SEED} \
       --wandb_group ${WANDB_GROUP} \
+      --lr ${LR} \
       --visualize
 done
 
@@ -152,6 +155,7 @@ for SEED in "${SEEDS[@]}"; do
       --num_workers ${NUM_WORKERS} \
       --seed ${SEED} \
       --wandb_group ${WANDB_GROUP} \
+      --lr ${LR} \
       --visualize
 done
 
