@@ -68,8 +68,12 @@ def evaluate_model(model, dataloader, device, num_classes, threshold=0.5):
                 # Compute per-frame confidence score: average probability of predicted class in predicted mask
                 # Move to CPU to avoid large GPU tensor allocation
                 probs_np = probs[i].cpu().numpy()  # Shape: (num_classes, H, W)
-                pred_class = preds[i, 0].cpu().item()  # Get the predicted class index
-                pred_class_probs = probs_np[pred_class]  # Shape: (H, W)
+                preds_np = preds[i, 0].cpu().numpy()  # Shape: (H, W) - class index per pixel
+                
+                # Use advanced indexing to get prob of predicted class for each pixel
+                H, W = preds_np.shape
+                h_indices, w_indices = np.mgrid[0:H, 0:W]
+                pred_class_probs = probs_np[preds_np, h_indices, w_indices]  # Shape: (H, W)
                 pred_mask = (pred_np > 0)  # Mask of non-background predictions
                 
                 if pred_mask.sum() > 0:
