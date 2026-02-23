@@ -149,8 +149,29 @@ class ViTBackbone(nn.Module):
         # Get the backbone (either from ViT wrapper or directly)
         if hasattr(vit_model, 'backbone'):
             self.backbone = vit_model.backbone
+            # Check if ViT wrapper has custom get_intermediate_layers (for HF models)
+            if hasattr(vit_model, '_get_intermediate_layers_hf'):
+                # Bind the HF wrapper to this instance
+                self.get_intermediate_layers_fn = lambda x, n: vit_model._get_intermediate_layers_hf(x, n, return_class_token=False)
+                self.is_hf_model = True
+            elif hasattr(vit_model, '_get_intermediate_layers_timm'):
+                # Bind the timm wrapper to this instance
+                self.get_intermediate_layers_fn = lambda x, n: vit_model._get_intermediate_layers_timm(x, n, return_prefix_tokens=False)
+                self.is_hf_model = False
+            else:
+                # Direct timm model
+                self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
+                self.is_hf_model = False
         else:
             self.backbone = vit_model
+            # Check if it's an HF model (has embeddings and layer attributes)
+            if hasattr(self.backbone, 'embeddings') and hasattr(self.backbone, 'layer'):
+                self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_class_token=False)
+                self.is_hf_model = True
+            else:
+                # timm model
+                self.get_intermediate_layers_fn = lambda x, n: self.backbone.get_intermediate_layers(x, n, return_prefix_tokens=False)
+                self.is_hf_model = False
         
         # Get model properties
         if hasattr(self.backbone, 'patch_embed'):
@@ -166,8 +187,8 @@ class ViTBackbone(nn.Module):
     def forward(self, x):
         """Extract spatial patch features from ViT backbone."""
         # Use get_intermediate_layers to extract patch features from the last layer
-        # This works for both timm and HF models thanks to ViT's wrapping
-        intermediate = self.backbone.get_intermediate_layers(x, n=[11], return_class_token=False)
+        # This works for both timm and HF models thanks to our wrapper
+        intermediate = self.get_intermediate_layers_fn(x, [11])
         
         # intermediate is a list of outputs from each requested layer
         # For layer 11 (the last transformer layer), get the patch tokens
