@@ -152,7 +152,8 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     if not clip_frames:
         return []
     
-    h, w = clip_frames[0].size[1], clip_frames[0].size[0]
+    # Get target dimensions from PIL image (width, height)
+    w, h = clip_frames[0].size
     
     if not class_clicks:
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
@@ -214,7 +215,11 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
             combined_mask = np.zeros((h, w), dtype=np.int32)
             for i, class_id in enumerate(class_id_list):
                 if i < len(frame_masks):
-                    mask_binary = (frame_masks[i] > 0.5).astype(np.uint8)
+                    mask = frame_masks[i]
+                    # Resize mask to match target size if needed
+                    if mask.shape != (h, w):
+                        mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+                    mask_binary = (mask > 0.5).astype(np.uint8)
                     combined_mask[mask_binary > 0] = class_id
             predictions.append(combined_mask)
             
@@ -253,7 +258,11 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                 combined_mask = np.zeros((h, w), dtype=np.int32)
                 for i, class_id in enumerate(class_id_list):
                     if i < len(frame_masks):
-                        mask_binary = (frame_masks[i] > 0.5).astype(np.uint8)
+                        mask = frame_masks[i]
+                        # Resize mask to match target size if needed
+                        if mask.shape != (h, w):
+                            mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+                        mask_binary = (mask > 0.5).astype(np.uint8)
                         combined_mask[mask_binary > 0] = class_id
                 predictions.append(combined_mask)
     
@@ -279,77 +288,85 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
     Returns:
         predictions: List of predicted masks (H, W) for each frame
     """
-    if not clip_frames or not class_clicks:
-        return [np.zeros((clip_frames[0].size[1], clip_frames[0].size[0]), dtype=np.int32) 
-                for _ in clip_frames]
+    if not clip_frames:
+        return []
+    
+    # Get target dimensions from PIL image (width, height)
+    w, h = clip_frames[0].size
+    
+    if not class_clicks:
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     predictions = []
     
     # Organize clicks by object (class) for proper 4-level nesting
-    # Format: [image_level][object_level][point_level][coordinates]
     objects_points = []  # Will contain one list of points per object/class
     class_id_list = []  # Track which class each object corresponds to
     
     for class_id, clicks in sorted(class_clicks.items()):
-        # Convert clicks to proper format: list of [x, y] pairs
-        points_for_object = [[x, y] for x, y in clicks]
-        objects_points.append(points_for_object)
-        class_id_list.append(class_id)
+        if clicks:  # Only add if there are actual clicks
+            # Convert clicks to proper format: list of [x, y] pairs
+            points_for_object = [[x, y] for x, y in clicks]
+            objects_points.append(points_for_object)
+            class_id_list.append(class_id)
     
-    with torch.no_grad():
-        # SAM3 processes video frames together
-        # Prepare inputs for video propagation
-        # Input points: [image_level][object_level][point_level][coordinates]
-        inputs = processor(
-            images=clip_frames,
-            input_points=[objects_points],  # Wrap in image-level list
-            return_tensors="pt"
-        ).to(device)
-        
-        outputs = model(**inputs)
-        
-        # Get predicted masks for all frames
-        if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
-            pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()  # Could be (B, num_objects, H, W) or similar
-        elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
-            pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()  # Could be (B, num_objects, H, W) or similar
-        else:
-            # Fallback: create empty predictions
-            h = clip_frames[0].size[1]
-            w = clip_frames[0].size[0]
-            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
-        
-        # Handle different mask shapes
-        if pred_masks.ndim == 4:
-            # (B, num_objects, H, W) - normal case
-            num_frames = pred_masks.shape[0]
-        elif pred_masks.ndim == 3:
-            # (num_objects, H, W) - might be single frame or different format
-            num_frames = 1
-            pred_masks = pred_masks[np.newaxis, ...]  # Add batch dimension
-        else:
-            h = clip_frames[0].size[1]
-            w = clip_frames[0].size[0]
-            return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
-        
-        for frame_idx in range(len(clip_frames)):
-            if frame_idx < len(pred_masks):
-                masks = pred_masks[frame_idx]  # (num_objects, H, W)
-                h, w = masks.shape[1:]
+    # If no valid points after filtering, return empty masks
+    if not objects_points:
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
+    
+    try:
+        with torch.no_grad():
+            # SAM3 processes video frames together
+            # Input points: [image_level][object_level][point_level][coordinates]
+            inputs = processor(
+                images=clip_frames,
+                input_points=[objects_points],  # Wrap in image-level list
+                return_tensors="pt"
+            ).to(device)
+            
+            outputs = model(**inputs)
+            
+            # Get predicted masks for all frames
+            if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
+                pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()
+            elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
+                pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
             else:
-                # Use size from first frame if index out of range
-                h = clip_frames[0].size[1]
-                w = clip_frames[0].size[0]
-                masks = np.zeros((len(class_id_list), h, w))
+                return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
             
-            combined_mask = np.zeros((h, w), dtype=np.int32)
+            # Handle different mask shapes
+            if pred_masks.ndim == 4:
+                # (B, num_objects, H, W) - normal case
+                num_frames = pred_masks.shape[0]
+            elif pred_masks.ndim == 3:
+                # (num_objects, H, W) - might be single frame or different format
+                num_frames = 1
+                pred_masks = pred_masks[np.newaxis, ...]  # Add batch dimension
+            else:
+                return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
             
-            for i, class_id in enumerate(class_id_list):
-                if i < len(masks):
-                    mask_binary = (masks[i] > 0.5).astype(np.uint8)
-                    combined_mask[mask_binary > 0] = class_id
-            
-            predictions.append(combined_mask)
+            for frame_idx in range(len(clip_frames)):
+                if frame_idx < len(pred_masks):
+                    masks = pred_masks[frame_idx]  # (num_objects, H, W)
+                else:
+                    masks = np.zeros((len(class_id_list), h, w))
+                
+                combined_mask = np.zeros((h, w), dtype=np.int32)
+                
+                for i, class_id in enumerate(class_id_list):
+                    if i < len(masks):
+                        mask = masks[i]
+                        # Resize mask to match target size if needed
+                        if mask.shape != (h, w):
+                            mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+                        mask_binary = (mask > 0.5).astype(np.uint8)
+                        combined_mask[mask_binary > 0] = class_id
+                
+                predictions.append(combined_mask)
+    
+    except Exception as e:
+        print(f"Error processing clip with SAM3: {e}")
+        return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     return predictions
 

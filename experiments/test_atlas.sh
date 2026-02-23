@@ -89,7 +89,7 @@ MODELS=(
     # Other models (commented out by default)
     "endofm|best_model.pth|endofm_atlas|0|32"
     "endovit|best_model.pth|endovit_atlas|0|32"
-    "gastronet5m|best_model.pth|gastronet5m_atlas|0|32"
+    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|32"
 )
 
 # ===========================
