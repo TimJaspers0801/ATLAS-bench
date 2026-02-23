@@ -32,7 +32,7 @@ def train(args):
     torch.cuda.manual_seed_all(args.seed)
 
     # Init wandb
-    wandb.init(project="ATLAS-BENCH-FINAL",
+    wandb.init(project="ATLAS-BENCH-FINAL-WITH-BACKGROUND",
                config=vars(args),
                name=args.experiment_name,
                group=args.wandb_group,
