@@ -35,6 +35,17 @@ def evaluate_model(model, dataloader, device, num_classes):
 
             outputs = model(images)
             probs = torch.softmax(outputs, dim=1)
+            
+            # Resize logits to match ground truth dimensions using bilinear interpolation
+            # This must happen BEFORE argmax (same as in training code)
+            if probs.shape[-2:] != gt_masks.shape[-2:]:
+                probs = torch.nn.functional.interpolate(
+                    probs,
+                    size=gt_masks.shape[-2:],
+                    mode='bilinear',
+                    align_corners=False
+                )
+            
             preds = torch.argmax(probs, dim=1, keepdim=True)
             
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
@@ -210,13 +221,23 @@ def evaluate_atlas_temporal(
             mask_logits = mask_logits_per_block[-1]  # (B, num_q, H, W)
             class_logits = class_logits_per_block[-1]  # (B, num_q, num_classes+1)
             
-            # Convert query-level predictions to per-pixel predictions
-            # Shape: (B, num_classes, H, W)
+            # Convert query-level predictions to per-pixel logits
+            # Shape: (B, num_classes, H, W) - logits at model output resolution
             per_pixel_logits = torch.einsum(
                 "bqhw, bqc -> bchw",
                 mask_logits.sigmoid(),
                 class_logits.softmax(dim=-1)[..., :-1]  # Exclude background class
             )
+            
+            # Resize logits to match ground truth dimensions using bilinear interpolation
+            # This must happen BEFORE argmax (same as in training code)
+            if per_pixel_logits.shape[-2:] != gt_masks.shape[-2:]:
+                per_pixel_logits = torch.nn.functional.interpolate(
+                    per_pixel_logits,
+                    size=gt_masks.shape[-2:],
+                    mode='bilinear',
+                    align_corners=False
+                )
             
             # Get predictions
             preds = torch.argmax(per_pixel_logits, dim=1)  # (B, H, W)
