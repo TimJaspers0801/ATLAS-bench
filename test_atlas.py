@@ -231,21 +231,24 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         else:
             state_dict = checkpoint
         
-        # Transform keys from checkpoint format to model format
+        # First pass: understand what format the checkpoint is in
+        has_timm_keys = any("patch_embed" in k or "blocks" in k for k in state_dict.keys() if k.startswith("network.encoder.backbone"))
+        has_hf_keys = any("embeddings" in k or "layer" in k for k in state_dict.keys() if k.startswith("network.encoder.backbone"))
+        
+        # Transform keys
         new_state_dict = {}
         for key, value in state_dict.items():
-            # Remove criterion keys
+            # Skip criterion keys (training-only)
             if key.startswith("criterion."):
                 continue
             
-            # Strip "network." prefix
-            new_key = key.replace("network.", "", 1) if key.startswith("network.") else key
+            # Strip "network." prefix from Lightning wrapper
+            new_key = key[8:] if key.startswith("network.") else key  # len("network.") = 8
             
-            # Map TIMM-like naming to HuggingFace format used by the model
-            # patch_embed -> embeddings
-            new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
-            # blocks -> layer
-            new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
+            # If checkpoint has TIMM format but we need HF format, convert
+            if has_timm_keys and not has_hf_keys:
+                new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
+                new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
             
             new_state_dict[new_key] = value
         
