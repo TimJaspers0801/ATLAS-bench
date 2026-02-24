@@ -73,7 +73,7 @@ MODELS=(
     # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|32"
     
     # EOMT models
-    "eomt_vitl_dinov3_surgenet|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
+    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
 
     # # # SurgeNet Baselines
     "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
