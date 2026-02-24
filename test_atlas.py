@@ -246,22 +246,8 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         for key in keys_to_remove:
             del new_state_dict[key]
         
-        missing_keys, unexpected_keys = model.load_state_dict(new_state_dict, strict=False)
-        if not missing_keys and not unexpected_keys:
-            print("✓ All keys loaded successfully")
-        else:
-            if missing_keys:
-                print(f"⚠ Missing keys: {len(missing_keys)}")
-                for key in list(missing_keys)[:5]:
-                    print(f"    {key}")
-                if len(missing_keys) > 5:
-                    print(f"    ... and {len(missing_keys) - 5} more")
-            if unexpected_keys:
-                print(f"⚠ Unexpected keys: {len(unexpected_keys)}")
-                for key in list(unexpected_keys)[:5]:
-                    print(f"    {key}")
-                if len(unexpected_keys) > 5:
-                    print(f"    ... and {len(unexpected_keys) - 5} more")
+        msg = model.load_state_dict(new_state_dict, strict=False)
+        print(msg)
         
     return model.to(device)
 
