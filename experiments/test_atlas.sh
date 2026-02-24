@@ -16,6 +16,8 @@ echo "Job ID: ${SLURM_JOB_ID}"
 echo "GPUs: ${CUDA_VISIBLE_DEVICES}"
 echo "========================================"
 
+export HF_TOKEN=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
+
 # ===========================
 # Paths
 # ===========================
