@@ -254,6 +254,7 @@ def save_random_visualizations(
     num_samples,
     img_size,
     is_videomt,
+    is_atlas,
     seed,
     mask_background=False,
 ):
@@ -261,19 +262,33 @@ def save_random_visualizations(
         return
 
     os.makedirs(output_dir, exist_ok=True)
-    rng = random.Random(seed)
-    samples = []
-    seen = 0
-
+    
     mean = torch.tensor(dataloader.dataset.mean).view(3, 1, 1)
     std = torch.tensor(dataloader.dataset.std).view(3, 1, 1)
 
     with torch.no_grad():
         current_video = None
-
+        current_clip = None
+        prev_query_embed = None
+        sample_count = 0
+        
         for batch in tqdm(dataloader, desc="Collecting visualizations"):
+            if sample_count >= num_samples:
+                break
+                
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
+            
+            # Get clip info
+            procedure = batch["procedure"][0] if isinstance(batch["procedure"], list) else batch["procedure"]
+            video = batch["video"][0] if isinstance(batch["video"], list) else batch["video"]
+            clip_id = batch["clip"][0] if isinstance(batch["clip"], list) else batch["clip"]
+            clip_key = f"{procedure}/{video}/{clip_id}"
+            
+            # Reset queries when entering a new clip (for ATLAS)
+            if is_atlas and current_clip != clip_key:
+                current_clip = clip_key
+                prev_query_embed = None
 
             if is_videomt:
                 batch_video = f"{batch['procedure'][0]}/{batch['video'][0]}"
@@ -297,45 +312,77 @@ def save_random_visualizations(
                 pred_masks_prob = torch.sigmoid(pred_masks)
                 semseg = torch.einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob)
                 preds = semseg.argmax(dim=1)
+            elif is_atlas:
+                # ATLAS model with query propagation
+                outputs = model(
+                    images,
+                    prev_query_embed=prev_query_embed,
+                    return_query_embedding=True,
+                )
+                
+                # Unpack outputs
+                mask_logits_per_block, class_logits_per_block, procedure_logits_per_block, query_embed = outputs
+                prev_query_embed = query_embed  # Store for next frame
+                
+                # Get predictions from final block
+                mask_logits = mask_logits_per_block[-1]  # (B, num_q, H, W)
+                class_logits = class_logits_per_block[-1]  # (B, num_q, num_classes+1)
+                
+                # Convert query-level predictions to per-pixel logits
+                per_pixel_logits = torch.einsum(
+                    "bqhw, bqc -> bchw",
+                    mask_logits.sigmoid(),
+                    class_logits.softmax(dim=-1)[..., :-1]
+                )
+                
+                # Resize logits to match GT size
+                if per_pixel_logits.shape[-2:] != gt_masks.shape[-2:]:
+                    per_pixel_logits = torch.nn.functional.interpolate(
+                        per_pixel_logits,
+                        size=gt_masks.shape[-2:],
+                        mode='bilinear',
+                        align_corners=False
+                    )
+                
+                preds = torch.argmax(per_pixel_logits, dim=1)
             else:
                 outputs = model(images)
                 probs = torch.softmax(outputs, dim=1)
                 preds = torch.argmax(probs, dim=1)
 
             for i in range(images.shape[0]):
-                seen += 1
-                if len(samples) < num_samples:
-                    samples.append((images[i].cpu(), gt_masks[i].cpu(), preds[i].cpu()))
-                else:
-                    j = rng.randint(0, seen - 1)
-                    if j < num_samples:
-                        samples[j] = (images[i].cpu(), gt_masks[i].cpu(), preds[i].cpu())
+                if sample_count >= num_samples:
+                    break
+                    
+                img = images[i].cpu()
+                gt_mask = gt_masks[i].cpu()
+                pred_mask = preds[i].cpu()
 
-    for idx, (img, gt_mask, pred_mask) in enumerate(samples):
-        img_np = denormalize(img, mean, std)
-        gt_np = gt_mask.squeeze().numpy().astype(np.int32)
-        pred_np = pred_mask.squeeze().numpy().astype(np.int32)
+                img_np = denormalize(img, mean, std)
+                gt_np = gt_mask.squeeze().numpy().astype(np.int32)
+                pred_np = pred_mask.squeeze().numpy().astype(np.int32)
 
-        if pred_np.shape != gt_np.shape:
-            pred_np = cv2.resize(
-                pred_np.astype(np.uint8),
-                (gt_np.shape[1], gt_np.shape[0]),
-                interpolation=cv2.INTER_NEAREST
-            ).astype(np.int32)
-        
-        # Mask background predictions if requested (makes visualization cleaner)
-        if mask_background:
-            pred_np[gt_np == 0] = 0
+                if pred_np.shape != gt_np.shape:
+                    pred_np = cv2.resize(
+                        pred_np.astype(np.uint8),
+                        (gt_np.shape[1], gt_np.shape[0]),
+                        interpolation=cv2.INTER_NEAREST
+                    ).astype(np.int32)
+                
+                # Mask background predictions if requested (makes visualization cleaner)
+                if mask_background:
+                    pred_np[gt_np == 0] = 0
 
-        gt_overlay = apply_mask_overlay(img_np, gt_np, color_palette)
-        pred_overlay = apply_mask_overlay(img_np, pred_np, color_palette)
+                gt_overlay = apply_mask_overlay(img_np, gt_np, color_palette)
+                pred_overlay = apply_mask_overlay(img_np, pred_np, color_palette)
 
-        row = np.concatenate([img_np, gt_overlay, pred_overlay], axis=1)
-        if row.shape[0] != img_size:
-            row = cv2.resize(row, (img_size * 3, img_size), interpolation=cv2.INTER_AREA)
+                row = np.concatenate([img_np, gt_overlay, pred_overlay], axis=1)
+                if row.shape[0] != img_size:
+                    row = cv2.resize(row, (img_size * 3, img_size), interpolation=cv2.INTER_AREA)
 
-        out_path = os.path.join(output_dir, f"sample_{idx:02d}.png")
-        cv2.imwrite(out_path, row[:, :, ::-1])
+                out_path = os.path.join(output_dir, f"sample_{sample_count:03d}.png")
+                cv2.imwrite(out_path, row[:, :, ::-1])
+                sample_count += 1
 
 
 def main(args):
@@ -434,6 +481,7 @@ def main(args):
             num_samples=args.visualize_samples,
             img_size=img_size,
             is_videomt=(args.model == "videomt"),
+            is_atlas=args.model.startswith("atlas"),
             seed=args.seed,
             mask_background=mask_bg,
         )
