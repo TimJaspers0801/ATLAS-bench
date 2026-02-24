@@ -2,11 +2,14 @@
 # © 2025 Mobile Perception Systems Lab at TU/e. All rights reserved.
 # Licensed under the MIT License.
 # ---------------------------------------------------------------
+
+
 from typing import Optional
-import timm
 import torch
 import torch.nn as nn
-from models.decoders import build_decoder
+
+import timm
+from transformers import AutoModel
 
 
 class ViT(nn.Module):
@@ -14,25 +17,62 @@ class ViT(nn.Module):
         self,
         img_size: tuple[int, int],
         patch_size=16,
-        backbone_name="vit_large_patch14_dinov2",
-        num_classes=0,
+        backbone_name="vit_large_patch14_reg4_dinov2",
         ckpt_path: Optional[str] = None,
+        pixel_mean: Optional[list] = None,
+        pixel_std: Optional[list] = None,
     ):
         super().__init__()
 
-        self.backbone = timm.create_model(
-            backbone_name,
-            pretrained=ckpt_path is None,
-            img_size=img_size,
-            patch_size=patch_size,
-            num_classes=num_classes,
-        )
+        if "/" in backbone_name:
+            self.backbone = self.transformers_to_timm(
+                AutoModel.from_pretrained(
+                    backbone_name,
+                    token=True,  # Use HF_TOKEN from environment
+                ),
+                img_size,
+            )
+        else:
+            self.backbone = timm.create_model(
+                backbone_name,
+                pretrained=ckpt_path is None,
+                img_size=img_size,
+                patch_size=patch_size,
+                num_classes=0,
+            )
 
-        pixel_mean = torch.tensor(self.backbone.default_cfg["mean"]).reshape(
-            1, -1, 1, 1
-        )
-        pixel_std = torch.tensor(self.backbone.default_cfg["std"]).reshape(1, -1, 1, 1)
+        # Use custom normalization if provided, otherwise use ImageNet defaults
+        if pixel_mean is None:
+            pixel_mean = [0.485, 0.456, 0.406]
+        if pixel_std is None:
+            pixel_std = [0.229, 0.224, 0.225]
+
+        pixel_mean = torch.tensor(pixel_mean).reshape(1, -1, 1, 1)
+        pixel_std = torch.tensor(pixel_std).reshape(1, -1, 1, 1)
 
         self.register_buffer("pixel_mean", pixel_mean)
         self.register_buffer("pixel_std", pixel_std)
+
+    def transformers_to_timm(self, backbone, img_size: tuple[int, int]):
+        backbone.patch_embed = backbone.embeddings
+        backbone.patch_embed.patch_size = (
+            backbone.embeddings.config.patch_size,
+            backbone.embeddings.config.patch_size,
+        )
+        backbone.patch_embed.grid_size = (
+            img_size[0] // backbone.embeddings.config.patch_size,
+            img_size[1] // backbone.embeddings.config.patch_size,
+        )
+
+        backbone.embed_dim = backbone.embeddings.config.hidden_size
+        backbone.num_prefix_tokens = backbone.patch_embed.config.num_register_tokens + 1
+        backbone.blocks = backbone.layer
+
+        del (
+            backbone.patch_embed.mask_token,
+            backbone.embeddings,
+            backbone.layer,
+        )
+
+        return backbone
 
