@@ -29,7 +29,7 @@ class AtlasDataset(Dataset):
         first_frame_only=False,
         frame_percentage=100,
         seed=42,
-        normalization_type="none",
+        normalization_type="surgical",
     ):
         assert split in {"train", "val", "test"}
         assert normalization_type in {"none", "surgical", "imagenet"}

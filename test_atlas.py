@@ -105,10 +105,7 @@ def get_image_size(model_name: str) -> int:
 
 
 def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
-    """Load a model from the registry with optional checkpoint."""
-    if model_name == "videomt":
-        return load_videomt(checkpoint_path, num_classes, device)
-    elif model_name.startswith("eomt"):
+    if model_name.startswith("eomt"):
         return load_eomt(model_name, checkpoint_path, num_classes, device)
     elif model_name in MODEL_REGISTRY:
         # Load from registry
@@ -129,71 +126,6 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
             f"  EOMT variants: eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2, "
             f"eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3"
         )
-
-
-def load_videomt(checkpoint_path: str, num_classes: int, device: torch.device):
-    """Load VideoMT model for online video processing."""
-    from models.videomt.videomt_standalone import VideoMT
-    
-    # Initialize with training configuration from ATLAS config
-    model = VideoMT(
-        img_size=1280,
-        num_classes=124,
-        num_queries=200,
-        task='vss',
-        model_name='vit_large_patch14_dinov2.lvd142m',
-        pixel_mean=[0.485, 0.456, 0.406],
-        pixel_std=[0.229, 0.224, 0.225],
-    )
-    
-    if checkpoint_path and os.path.isfile(checkpoint_path):
-        print(f"Loading VideoMT checkpoint: {checkpoint_path}")
-        state_dict = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        
-        # Handle key name mismatches between Detectron2 version and standalone
-        key_mappings = {
-            'q.weight': 'query_embedding.weight',  # Detectron2 uses 'q', standalone uses 'query_embedding'
-        }
-        
-        for old_key, new_key in key_mappings.items():
-            if old_key in state_dict and new_key not in state_dict:
-                print(f"  Remapping key: {old_key} → {new_key}")
-                state_dict[new_key] = state_dict.pop(old_key)
-        
-        # NOTE: Model is now created with class_token=False to match checkpoint structure
-        # Both checkpoint and model now have: [spatial_tokens only], no class token
-        # No pos_embed expansion needed
-        
-        # Remove keys that are not part of the model
-        keys_to_remove = ['criterion.empty_weight', 'attn_mask_probs', 'encoder.backbone.reg_token']
-        for key in keys_to_remove:
-
-            if key in state_dict:
-                print(f"  Removing non-model key: {key}")
-                del state_dict[key]
-        
-        missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-        if not missing_keys and not unexpected_keys:
-            print("✓ All keys loaded successfully")
-        else:
-            if missing_keys:
-                print(f"⚠ Missing keys ({len(missing_keys)}):")
-                # pixel_mean/pixel_std are buffers that will be initialized by register_buffer
-                important_missing = [k for k in missing_keys if 'pixel_' not in k]
-                if important_missing:
-                    print(f"  Important missing keys:")
-                    for key in important_missing[:5]:
-                        print(f"    - {key}")
-                    if len(important_missing) > 5:
-                        print(f"    ... and {len(important_missing) - 5} more")
-                else:
-                    print(f"  (Only pixel normalization missing, which is acceptable)")
-            if unexpected_keys:
-                print(f"⚠ Unexpected keys ({len(unexpected_keys)}):")
-                for key in unexpected_keys:
-                    print(f"  - {key}")
-    
-    return model.to(device)
 
 
 def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
@@ -256,154 +188,6 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         print(msg)
         
     return model.to(device)
-
-
-def evaluate_videomt(model, test_loader, device, num_classes, window_size=16):
-    """
-    Evaluate VideoMT in online fashion, processing frames sequentially
-    within each clip while maintaining temporal state.
-    """
-    model.eval()
-    
-    # Track scores per class
-    class_ious = defaultdict(list)
-    class_dices = defaultdict(list)
-    
-    # AP tracking
-    from evaluation.metrics import SegmentationAPEvaluator
-    clip_ap = {}
-    current_clip = None
-    ap_evaluator = None
-    
-    mean = torch.tensor(test_loader.dataset.mean).view(3, 1, 1)
-    std = torch.tensor(test_loader.dataset.std).view(3, 1, 1)
-
-    def process_clip(clip_id, frames, gts):
-        nonlocal current_clip, ap_evaluator
-
-        if not frames:
-            return
-
-        if ap_evaluator is not None:
-            clip_ap[current_clip] = ap_evaluator.evaluate()
-        current_clip = clip_id
-        ap_evaluator = SegmentationAPEvaluator()
-
-        classes_to_eval = range(1, num_classes + 1)
-
-        for start in range(0, len(frames), window_size):
-            end = min(start + window_size, len(frames))
-            window_frames = frames[start:end]
-            window_gts = gts[start:end]
-
-            frames_tensor = torch.stack(window_frames, dim=0).to(device)
-            outputs = model.process_video(frames_tensor, normalize=True, match_queries=True)
-
-            pred_logits = outputs['pred_logits'][0]  # (Q, C+1)
-            pred_masks = outputs['pred_masks'][0]    # (Q, T, H, W)
-
-            target_h, target_w = window_gts[0].shape[-2:]
-            if pred_masks.shape[-2:] != (target_h, target_w):
-                pred_masks = F.interpolate(
-                    pred_masks,
-                    size=(target_h, target_w),
-                    mode='bilinear',
-                    align_corners=False,
-                )
-
-            mask_cls = F.softmax(pred_logits, dim=-1)[:, :-1]  # (Q, C)
-            mask_pred = pred_masks.sigmoid()  # (Q, T, H, W)
-            semseg = torch.einsum("qc,qthw->cthw", mask_cls, mask_pred)
-            sem_score, sem_mask = semseg.max(0)  # (T, H, W)
-
-            for t in range(sem_mask.shape[0]):
-                pred_np = sem_mask[t].cpu().numpy()
-                gt_np = window_gts[t].squeeze().cpu().numpy()
-
-                gt_binary = (gt_np > 0).astype(np.uint8)
-                pred_binary = (pred_np > 0).astype(np.uint8)
-                max_score = sem_score[t].max().item()
-                ap_evaluator.add_frame(gt_binary, pred_binary, max_score)
-
-                from evaluation.metrics import compute_class_metrics
-                for c in classes_to_eval:
-                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c, ignore_index=255)
-                    if iou_c is not None:
-                        class_ious[c].append(iou_c)
-                        class_dices[c].append(dice_c)
-
-    with torch.no_grad():
-        current_clip = None
-        clip_frames = []
-        clip_gts = []
-
-        for batch in tqdm(test_loader, desc="Evaluating VideoMT"):
-            images = batch["image"].to(device)
-            gt_masks = batch["mask"].to(device)
-
-            for i in range(images.shape[0]):
-                clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
-
-                if current_clip is None:
-                    current_clip = clip_id
-
-                if clip_id != current_clip:
-                    process_clip(current_clip, clip_frames, clip_gts)
-                    clip_frames = []
-                    clip_gts = []
-                    current_clip = clip_id
-
-                frame = images[i].cpu() * std + mean
-                clip_frames.append(frame.clamp(0.0, 1.0))
-                clip_gts.append(gt_masks[i].cpu())
-
-        process_clip(current_clip, clip_frames, clip_gts)
-    
-    if ap_evaluator is not None:
-        clip_ap[current_clip] = ap_evaluator.evaluate()
-
-    # Aggregate metrics
-    from evaluation.metrics import compute_class_metrics
-    classes_to_eval = range(1, num_classes+1)
-    
-    final_per_class_iou = {}
-    final_per_class_dice = {}
-    
-    for c in classes_to_eval:
-        if len(class_ious[c]) > 0:
-            final_per_class_iou[c] = np.mean(class_ious[c])
-            final_per_class_dice[c] = np.mean(class_dices[c])
-        else:
-            final_per_class_iou[c] = 0.0
-            final_per_class_dice[c] = 0.0
-    
-    mIoU = np.mean(list(final_per_class_iou.values()))
-    mDice = np.mean(list(final_per_class_dice.values()))
-    
-    AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
-    AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
-    AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
-    
-    # Print report
-    print("\n" + "=" * 40)
-    print(f"{'Class ID':<10} | {'IoU':<10} | {'Dice':<10}")
-    print("-" * 40)
-    for c in classes_to_eval:
-        print(f"Class {c:<4} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
-    print("-" * 40)
-    print(f"{'OVERALL':<10} | {mIoU:.4f}     | {mDice:.4f}")
-    print(f"{'mAP':<10} | {AP_total:.4f}")
-    print("=" * 40 + "\n")
-    
-    return {
-        "mIoU": mIoU,
-        "Dice": mDice,
-        "AP": AP_total,
-        "AP50": AP_50,
-        "AP75": AP_75,
-        "per_class_iou": final_per_class_iou,
-        "per_class_dice": final_per_class_dice
-    }
 
 
 def save_random_visualizations(
@@ -521,9 +305,9 @@ def main(args):
     # Determine normalization type based on model
     # DINO models (v1, v2, v3) use ImageNet normalization
     if any(x in args.model.lower() for x in ['dinov1', 'dinov2', 'dinov3', 'vit']):
-        normalization_type = "imagenet"
+        normalization_type = "surgical"
     else:
-        normalization_type = "none"
+        normalization_type = "surgical"
     
     test_dataset = AtlasDataset(
         zip_path=args.data_path,
@@ -554,15 +338,8 @@ def main(args):
     
     # Evaluate
     print(f"\nEvaluating on test set...")
-    if args.model == "videomt":
-        metrics = evaluate_videomt(
-            model,
-            test_loader,
-            device,
-            args.num_classes,
-            window_size=args.videomt_window,
-        )
-    elif args.model.startswith("eomt"):
+
+    if args.model.startswith("eomt"):
         # EOMT models were trained without background class (0), all classes shifted down by 1
         metrics = evaluate_model(model, test_loader, device, args.num_classes)
     else:
