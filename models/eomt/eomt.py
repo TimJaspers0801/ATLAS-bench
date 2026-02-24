@@ -501,7 +501,7 @@ def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
         img_size=(518, 518),
-        backbone_name="facebook/dinov2-small",
+        backbone_name="vit_small_patch14_reg4_dinov2",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))
     return model
@@ -510,7 +510,7 @@ def eomt_vitb_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
         img_size=(518, 518),
-        backbone_name="facebook/dinov2-base",
+        backbone_name="vit_base_patch14_reg4_dinov2",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))
     return model
@@ -519,7 +519,7 @@ def eomt_vitl_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
         img_size=(518, 518),
-        backbone_name="facebook/dinov2-large",
+        backbone_name="vit_large_patch14_reg4_dinov2",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))
     return model
@@ -528,7 +528,7 @@ def eomt_vits_dinov3(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
         img_size=(256, 256),
-        backbone_name="facebook/dinov3-small-lvd1689m",
+        backbone_name="facebook/dinov3-vits16-pretrain-lvd1689m",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(256, 256))
     return model
@@ -537,7 +537,7 @@ def eomt_vitb_dinov3(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
         img_size=(256, 256),
-        backbone_name="facebook/dinov3-base-lvd1686m",
+        backbone_name="facebook/dinov3-vitb16-pretrain-lvd1689m",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(256, 256))
     return model
