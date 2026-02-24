@@ -171,7 +171,7 @@ class EoMT(nn.Module):
         # remember original spatial size
         orig_size = (x.shape[-2], x.shape[-1])
 
-        x = (x - self.encoder.pixel_mean) / self.encoder.pixel_std
+        # x = (x - self.encoder.pixel_mean) / self.encoder.pixel_std
 
         rope = None
         if hasattr(self.encoder.backbone, "rope_embeddings"):
