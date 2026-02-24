@@ -88,6 +88,7 @@ IMAGE_SIZE_MAP = {
     "224": 224,
     "256": 256,
     "336": 336,
+    "518": 518,
     "dinov2": 224,
     "dinov3": 256,
     "gastronet": 336,
@@ -98,6 +99,14 @@ IMAGE_SIZE_MAP = {
 
 def get_image_size(model_name: str) -> int:
     """Infer image size from model name."""
+    # Special case: eomt_dinov2 models use 518x518
+    if "eomt" in model_name and "dinov2" in model_name:
+        return 518
+    
+    # Check for 518 in model name (explicit size specification)
+    if "518" in model_name:
+        return 518
+    
     for key, size in IMAGE_SIZE_MAP.items():
         if key in model_name:
             return size
@@ -200,6 +209,7 @@ def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: 
     # Map model names to loader functions
     atlas_loaders = {
         "atlas_vitl_dinov3": atlas_vitl_dinov3,
+        "atlas_vitl_dinov3_context": atlas_vitl_dinov3,
     }
     
     if model_name not in atlas_loaders:

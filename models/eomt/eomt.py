@@ -500,7 +500,7 @@ def get_param_groups_llrd(model: torch.nn.Module, base_lr: float, weight_decay: 
 def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
-        img_size=(224, 224),
+        img_size=(518, 518),
         backbone_name="facebook/dinov2-small",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))
@@ -509,7 +509,7 @@ def eomt_vits_dinov2(num_classes: int = 19, num_q: int = 100):
 def eomt_vitb_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
-        img_size=(224, 224),
+        img_size=(518, 518),
         backbone_name="facebook/dinov2-base",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))
@@ -518,7 +518,7 @@ def eomt_vitb_dinov2(num_classes: int = 19, num_q: int = 100):
 def eomt_vitl_dinov2(num_classes: int = 19, num_q: int = 100):
     from .vit import ViT
     encoder = ViT(
-        img_size=(224, 224),
+        img_size=(518, 518),
         backbone_name="facebook/dinov2-large",
     )
     model = EoMT(encoder=encoder, num_classes=num_classes, num_q=num_q, num_blocks=4, masked_attn_enabled=True, img_size=(224, 224))

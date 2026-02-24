@@ -379,3 +379,10 @@ def atlas_vitl_dinov3(
     )
     
     return model
+
+
+
+def atlas_vitl_dinov3_context(**kwargs):
+    """
+    Create ATLAS model with DINOv3 ViT-L backbone and only context queries.
+    """
