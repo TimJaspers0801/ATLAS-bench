@@ -105,7 +105,9 @@ def get_image_size(model_name: str) -> int:
 
 
 def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
-    if model_name.startswith("eomt"):
+    if model_name.startswith("atlas"):
+        return load_atlas(model_name, checkpoint_path, num_classes, device)
+    elif model_name.startswith("eomt"):
         return load_eomt(model_name, checkpoint_path, num_classes, device)
     elif model_name in MODEL_REGISTRY:
         # Load from registry
@@ -124,7 +126,8 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
             f"  Image-based: {', '.join(MODEL_REGISTRY.keys())}\n"
             f"  Video-based: videomt\n"
             f"  EOMT variants: eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2, "
-            f"eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3"
+            f"eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3\n"
+            f"  ATLAS (temporal): atlas_vitl_dinov3"
         )
 
 
@@ -188,6 +191,59 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         print(msg)
         
     return model.to(device)
+
+
+def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
+    """Load ATLAS model with temporal capabilities."""
+    from models.atlas.atlas import atlas_vitl_dinov3
+    
+    # Map model names to loader functions
+    atlas_loaders = {
+        "atlas_vitl_dinov3": atlas_vitl_dinov3,
+    }
+    
+    if model_name not in atlas_loaders:
+        raise ValueError(
+            f"Unknown ATLAS variant: {model_name}. Available: {', '.join(atlas_loaders.keys())}"
+        )
+    
+    print(f"Loading ATLAS model: {model_name}")
+    model = atlas_loaders[model_name](num_classes=num_classes)
+    
+    if checkpoint_path and os.path.isfile(checkpoint_path):
+        print(f"Loading ATLAS checkpoint: {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        
+        # Extract state dict from checkpoint
+        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+        elif isinstance(checkpoint, dict) and "model" in checkpoint:
+            state_dict = checkpoint["model"]
+        else:
+            state_dict = checkpoint
+        
+        # Strip "network." prefix from Lightning wrapper if present
+        new_state_dict = {}
+        for key, value in state_dict.items():
+            # Skip criterion keys (training-only)
+            if key.startswith("criterion."):
+                continue
+            
+            # Strip "network." prefix if present
+            new_key = key[8:] if key.startswith("network.") else key  # len("network.") = 8
+            new_state_dict[new_key] = value
+        
+        msg = model.load_state_dict(new_state_dict, strict=False)
+        print(msg)
+        
+    return model.to(device)
+
+
+def evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation=True):
+    """Wrapper function that calls evaluate_atlas_temporal from evaluation module."""
+    from evaluation.dataset_evaluation import evaluate_atlas_temporal as _evaluate_atlas_temporal
+    return _evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation)
+
 
 
 def save_random_visualizations(
@@ -336,10 +392,29 @@ def main(args):
         device
     )
     
+    # For ATLAS models, enforce batch_size=1 for proper temporal processing
+    if args.model.startswith("atlas"):
+        if args.batch_size != 1:
+            print(f"⚠️  Warning: ATLAS models require batch_size=1 for temporal query propagation.")
+            print(f"   Overriding batch_size from {args.batch_size} to 1")
+            args.batch_size = 1
+            # Recreate dataloader with batch_size=1
+            test_loader = DataLoader(
+                test_dataset,
+                batch_size=args.batch_size,
+                shuffle=False,
+                num_workers=args.num_workers,
+                pin_memory=True,
+                persistent_workers=True,
+            )
+    
     # Evaluate
     print(f"\nEvaluating on test set...")
 
-    if args.model.startswith("eomt"):
+    if args.model.startswith("atlas"):
+        # ATLAS models use temporal evaluation
+        metrics = evaluate_atlas_temporal(model, test_loader, device, args.num_classes)
+    elif args.model.startswith("eomt"):
         # EOMT models were trained without background class (0), all classes shifted down by 1
         metrics = evaluate_model(model, test_loader, device, args.num_classes)
     else:

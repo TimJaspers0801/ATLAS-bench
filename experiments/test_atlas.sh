@@ -72,11 +72,14 @@ MODELS=(
     # "lh-dinov3-vitb-256-surgenet2m|best_model.pth|lh_dinov3_vitb_256_surgenet2m_atlas|0|32"
     # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|32"
     
-    # EOMT models
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
+    # ATLAS models (temporal)
+    "atlas_vitl_dinov3|atlas_vitl_dinov3_surgenet_seed0.pth|atlas_vitl_dinov3_surgenet|0|32"
 
-    # # # SurgeNet Baselines
-    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
+    # # EOMT models
+    # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
+    
+    # # # # SurgeNet Baselines
+    # "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
     # "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|32"
     # "surgenet-caformer-s18|best_model.pth|caformer_atlas|0|32"
     
@@ -89,7 +92,7 @@ MODELS=(
     # # Other models (commented out by default)
     # "endofm|best_model.pth|endofm_atlas|0|32"
     # "endovit|best_model.pth|endovit_atlas|0|32"
-    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|32"
+    # "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|32"
 )
 
 # ===========================
