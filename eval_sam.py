@@ -135,7 +135,7 @@ def generate_clicks_per_class(mask, num_clicks_per_class=2, seed=42):
     return class_clicks
 
 
-def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
+def process_clip_sam2(model, processor, clip_frames, class_clicks, device, debug=False):
     """
     Process a video clip with SAM2 using click prompts from first frame.
     
@@ -145,6 +145,7 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
         clip_frames: List of PIL Images
         class_clicks: Dict mapping class_id to click coordinates
         device: Torch device
+        debug: Print debug information
         
     Returns:
         predictions: List of predicted masks (H, W) for each frame
@@ -156,6 +157,8 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     w, h = clip_frames[0].size
     
     if not class_clicks:
+        if debug:
+            print("WARNING: No class clicks provided!")
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     predictions = []
@@ -164,15 +167,22 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
     objects_points = []  # Will contain one list of points per object/class
     class_id_list = []  # Track which class each object corresponds to
     
+    if debug:
+        print(f"Class clicks: {class_clicks}")
+    
     for class_id, clicks in sorted(class_clicks.items()):
         if clicks:  # Only add if there are actual clicks
             # Convert clicks to proper format: list of [x, y] pairs
             points_for_object = [[x, y] for x, y in clicks]
             objects_points.append(points_for_object)
             class_id_list.append(class_id)
+            if debug:
+                print(f"  Class {class_id}: {len(clicks)} clicks")
     
     # If no valid points after filtering, return empty masks
     if not objects_points:
+        if debug:
+            print("WARNING: No valid points after filtering!")
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     # Process all frames with prompts from the first frame
@@ -188,15 +198,32 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                 return_tensors="pt"
             ).to(device)
             
+            if debug:
+                print(f"Processor input keys: {inputs.keys()}")
+                for key, val in inputs.items():
+                    if isinstance(val, torch.Tensor):
+                        print(f"  {key}: shape={val.shape}, dtype={val.dtype}")
+            
             outputs = model(**inputs)
+            
+            if debug:
+                print(f"Model output keys: {outputs.keys() if hasattr(outputs, 'keys') else dir(outputs)}")
             
             # Get masks
             if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
                 all_masks = outputs.pred_masks.sigmoid().cpu().numpy()
+                if debug:
+                    print(f"Using pred_masks: shape={all_masks.shape}, min={all_masks.min():.3f}, max={all_masks.max():.3f}")
             elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
                 all_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
+                if debug:
+                    print(f"Using mask_logits: shape={all_masks.shape}, min={all_masks.min():.3f}, max={all_masks.max():.3f}")
             else:
+                if debug:
+                    print("ERROR: No pred_masks or mask_logits in outputs!")
+                    print(f"Available outputs: {outputs}")
                 return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
+            
             
             # Extract first frame masks
             if all_masks.ndim == 5:
@@ -209,10 +236,18 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                 # (num_masks, H, W)
                 frame_masks = all_masks
             else:
+                if debug:
+                    print(f"ERROR: Unexpected mask shape: {all_masks.shape}")
                 return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
+            
+            if debug:
+                print(f"Frame masks shape: {frame_masks.shape}")
+                print(f"Frame masks value range: min={frame_masks.min():.3f}, max={frame_masks.max():.3f}")
             
             # Create first frame prediction
             combined_mask = np.zeros((h, w), dtype=np.int32)
+            num_masks_found = 0
+            
             for i, class_id in enumerate(class_id_list):
                 if i < len(frame_masks):
                     mask = frame_masks[i]
@@ -220,11 +255,24 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                     if mask.shape != (h, w):
                         mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
                     mask_binary = (mask > 0.5).astype(np.uint8)
-                    combined_mask[mask_binary > 0] = class_id
+                    num_pixels = mask_binary.sum()
+                    if debug:
+                        print(f"  Class {class_id}: mask shape={mask.shape}, pixels after threshold={num_pixels}")
+                    if num_pixels > 0:
+                        combined_mask[mask_binary > 0] = class_id
+                        num_masks_found += 1
+            
+            if debug:
+                unique_vals = np.unique(combined_mask)
+                print(f"Combined first frame mask: unique values={unique_vals}, total pixels={(combined_mask > 0).sum()}")
+            
             predictions.append(combined_mask)
             
             # For remaining frames, process without points (propagation)
             for frame_idx in range(1, len(clip_frames)):
+                if debug:
+                    print(f"Processing frame {frame_idx}...")
+                
                 inputs = processor(
                     [clip_frames[frame_idx]],
                     return_tensors="pt"
@@ -238,6 +286,8 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                 elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
                     all_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
                 else:
+                    if debug:
+                        print(f"  WARNING: No masks returned for frame {frame_idx}")
                     combined_mask = np.zeros((h, w), dtype=np.int32)
                     predictions.append(combined_mask)
                     continue
@@ -267,14 +317,16 @@ def process_clip_sam2(model, processor, clip_frames, class_clicks, device):
                 predictions.append(combined_mask)
     
     except Exception as e:
-        print(f"Error processing clip with SAM2: {e}")
+        print(f"ERROR processing clip with SAM2: {e}")
+        import traceback
+        traceback.print_exc()
         # Return empty masks for all frames if there's an error
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     return predictions
 
 
-def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
+def process_clip_sam3(model, processor, clip_frames, class_clicks, device, debug=False):
     """
     Process a video clip with SAM3 using click prompts from first frame.
     
@@ -284,6 +336,7 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
         clip_frames: List of PIL Images
         class_clicks: Dict mapping class_id to click coordinates
         device: Torch device
+        debug: Print debug information
         
     Returns:
         predictions: List of predicted masks (H, W) for each frame
@@ -295,6 +348,8 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
     w, h = clip_frames[0].size
     
     if not class_clicks:
+        if debug:
+            print("WARNING: No class clicks provided!")
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     predictions = []
@@ -303,46 +358,77 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
     objects_points = []  # Will contain one list of points per object/class
     class_id_list = []  # Track which class each object corresponds to
     
+    if debug:
+        print(f"Class clicks: {class_clicks}")
+    
     for class_id, clicks in sorted(class_clicks.items()):
         if clicks:  # Only add if there are actual clicks
             # Convert clicks to proper format: list of [x, y] pairs
             points_for_object = [[x, y] for x, y in clicks]
             objects_points.append(points_for_object)
             class_id_list.append(class_id)
+            if debug:
+                print(f"  Class {class_id}: {len(clicks)} clicks")
     
     # If no valid points after filtering, return empty masks
     if not objects_points:
+        if debug:
+            print("WARNING: No valid points after filtering!")
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     try:
         with torch.no_grad():
             # SAM3 processes video frames together
             # Input points: [image_level][object_level][point_level][coordinates]
+            if debug:
+                print(f"Calling processor with {len(clip_frames)} frames and {len(objects_points)} objects")
+            
             inputs = processor(
                 images=clip_frames,
                 input_points=[objects_points],  # Wrap in image-level list
                 return_tensors="pt"
             ).to(device)
             
+            if debug:
+                print(f"Processor input keys: {inputs.keys()}")
+                for key, val in inputs.items():
+                    if isinstance(val, torch.Tensor):
+                        print(f"  {key}: shape={val.shape}, dtype={val.dtype}")
+            
             outputs = model(**inputs)
+            
+            if debug:
+                print(f"Model output keys: {outputs.keys() if hasattr(outputs, 'keys') else dir(outputs)}")
             
             # Get predicted masks for all frames
             if hasattr(outputs, 'pred_masks') and outputs.pred_masks is not None:
                 pred_masks = outputs.pred_masks.sigmoid().cpu().numpy()
+                if debug:
+                    print(f"Using pred_masks: shape={pred_masks.shape}, min={pred_masks.min():.3f}, max={pred_masks.max():.3f}")
             elif hasattr(outputs, 'mask_logits') and outputs.mask_logits is not None:
                 pred_masks = torch.sigmoid(outputs.mask_logits).cpu().numpy()
+                if debug:
+                    print(f"Using mask_logits: shape={pred_masks.shape}, min={pred_masks.min():.3f}, max={pred_masks.max():.3f}")
             else:
+                if debug:
+                    print("ERROR: No pred_masks or mask_logits in outputs!")
                 return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
             
             # Handle different mask shapes
             if pred_masks.ndim == 4:
                 # (B, num_objects, H, W) - normal case
                 num_frames = pred_masks.shape[0]
+                if debug:
+                    print(f"Mask shape is 4D: (batch={pred_masks.shape[0]}, objects={pred_masks.shape[1]}, H={pred_masks.shape[2]}, W={pred_masks.shape[3]})")
             elif pred_masks.ndim == 3:
                 # (num_objects, H, W) - might be single frame or different format
                 num_frames = 1
                 pred_masks = pred_masks[np.newaxis, ...]  # Add batch dimension
+                if debug:
+                    print(f"Mask shape is 3D, treating as single frame")
             else:
+                if debug:
+                    print(f"ERROR: Unexpected mask shape: {pred_masks.shape}")
                 return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
             
             for frame_idx in range(len(clip_frames)):
@@ -350,6 +436,8 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
                     masks = pred_masks[frame_idx]  # (num_objects, H, W)
                 else:
                     masks = np.zeros((len(class_id_list), h, w))
+                    if debug:
+                        print(f"  Frame {frame_idx}: No masks in pred_masks, using zeros")
                 
                 combined_mask = np.zeros((h, w), dtype=np.int32)
                 
@@ -365,14 +453,16 @@ def process_clip_sam3(model, processor, clip_frames, class_clicks, device):
                 predictions.append(combined_mask)
     
     except Exception as e:
-        print(f"Error processing clip with SAM3: {e}")
+        print(f"ERROR processing clip with SAM3: {e}")
+        import traceback
+        traceback.print_exc()
         return [np.zeros((h, w), dtype=np.int32) for _ in clip_frames]
     
     return predictions
 
 
 def evaluate_sam(model, processor, test_loader, device, num_classes, num_clicks_per_class, 
-                 is_sam3=False, seed=42):
+                 is_sam3=False, seed=42, debug=False):
     """
     Evaluate SAM model on ATLAS test set.
     
@@ -385,8 +475,11 @@ def evaluate_sam(model, processor, test_loader, device, num_classes, num_clicks_
         num_clicks_per_class: Number of clicks to generate per class
         is_sam3: Whether using SAM3 (vs SAM2)
         seed: Random seed
+        debug: Print debug information
     """
     print(f"\nEvaluating SAM{'3' if is_sam3 else '2'} model...")
+    if debug:
+        print("DEBUG MODE ENABLED")
     
     # Track metrics per class
     class_ious = defaultdict(list)
@@ -409,16 +502,27 @@ def evaluate_sam(model, processor, test_loader, device, num_classes, num_clicks_
         ap_evaluator = SegmentationAPEvaluator()
         
         # Generate predictions for the clip
+        if debug:
+            print(f"\nProcessing clip: {clip_id}")
+        
         if is_sam3:
-            predictions = process_clip_sam3(model, processor, frames_pil, class_clicks, device)
+            predictions = process_clip_sam3(model, processor, frames_pil, class_clicks, device, debug=debug)
         else:
-            predictions = process_clip_sam2(model, processor, frames_pil, class_clicks, device)
+            predictions = process_clip_sam2(model, processor, frames_pil, class_clicks, device, debug=debug)
         
         # Evaluate each frame
         classes_to_eval = range(1, num_classes + 1)
         
-        for pred_mask, gt_mask in zip(predictions, gts):
+        if debug:
+            print(f"Processing {len(predictions)} predictions")
+        
+        for frame_idx, (pred_mask, gt_mask) in enumerate(zip(predictions, gts)):
             gt_np = gt_mask.squeeze().cpu().numpy().astype(np.int32)
+            
+            if debug and frame_idx == 0:
+                unique_gt = np.unique(gt_np)
+                unique_pred = np.unique(pred_mask)
+                print(f"  Frame 0: GT classes={unique_gt}, Pred classes={unique_pred}")
             
             # Resize prediction to match GT if needed
             if pred_mask.shape != gt_np.shape:
@@ -653,6 +757,7 @@ def main(args):
         num_clicks_per_class=args.num_clicks,
         is_sam3=is_sam3,
         seed=args.seed,
+        debug=args.debug,
     )
     
     # Save visualizations
@@ -768,6 +873,11 @@ if __name__ == "__main__":
         type=str,
         default="outputs/sam_visualizations",
         help="Directory to save visualizations"
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug output to diagnose issues"
     )
     
     args = parser.parse_args()

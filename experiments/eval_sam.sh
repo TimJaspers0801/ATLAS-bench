@@ -56,6 +56,57 @@ SAM_CONFIGS=(
 )
 
 # ===========================
+# Debugging mode (set to true to debug instead of full eval)
+# ===========================
+
+DEBUG_MODE=true
+
+if [ "$DEBUG_MODE" = true ]; then
+    echo ""
+    echo "========================================"
+    echo "RUNNING IN DEBUG MODE"
+    echo "========================================"
+    echo "Debugging first SAM configuration..."
+    
+    MODEL_NAME="sam2-hiera-large"
+    NUM_CLICKS=3
+    
+    echo ""
+    echo "Running debug_sam.py on single clip..."
+    echo "This will test with only 3 frames for fast diagnostics"
+    echo ""
+    
+    apptainer exec --nv \
+        --bind ${PROJECT_ROOT}:/workspace \
+        --bind ${DATA_ZIP}:/data/atlas.zip \
+        --pwd /workspace \
+        ${CONTAINER} \
+        python3 debug_sam.py \
+            --model ${MODEL_NAME} \
+            --data_path /data/atlas.zip \
+            --num_classes ${NUM_CLASSES} \
+            --num_clicks ${NUM_CLICKS} \
+            --img_size ${IMG_SIZE} \
+            --seed ${SEED}
+    
+    if [ $? -eq 0 ]; then
+        echo ""
+        echo "✅ Debug completed successfully"
+        echo ""
+        echo "If you see:"
+        echo "  - Frame 0 with predictions but Frames 1+ empty → SAM2 temporal tracking issue"
+        echo "  - All frames empty → No prompts or SAM not working"
+        echo "  - Low Dice scores → Model not aligning with GT"
+        echo ""
+    else
+        echo "❌ Debug failed"
+    fi
+    
+    echo "To run full evaluation after debugging, set DEBUG_MODE=false"
+    exit 0
+fi
+
+# ===========================
 # Test each configuration
 # ===========================
 
@@ -72,6 +123,9 @@ for sam_config in "${SAM_CONFIGS[@]}"; do
     echo "Model: ${MODEL_NAME}"
     echo "Clicks per class: ${NUM_CLICKS}"
     echo "========================================"
+    
+    # Option to run with debug output (verbose diagnostics)
+    # To enable: add --debug flag below
     
     # Run evaluation in container
     apptainer exec --nv \
@@ -105,6 +159,42 @@ echo ""
 echo "========================================"
 echo "All SAM evaluations completed!"
 echo "Results saved in: ${RESULTS_DIR}"
+echo "========================================"
+
+# ===========================
+# DEBUGGING & TROUBLESHOOTING
+# ===========================
+
+echo ""
+echo "========================================"
+echo "Debugging & Troubleshooting Guide"
+echo "========================================"
+echo ""
+echo "If you're getting Dice scores of 0, check the following:"
+echo ""
+echo "Option 1: Run debug_sam.py (fast, single clip)"
+echo "  - Set DEBUG_MODE=true at the top of this script"
+echo "  - Tests only first 3 frames for quick diagnosis"
+echo "  - Shows frame-by-frame predictions vs GT"
+echo ""
+echo "Option 2: Run eval_sam.py with --debug flag (full evaluation)"
+echo "  - Edit the eval_sam.py call to add: --debug"
+echo "  - Prints detailed SAM model inputs/outputs"
+echo "  - Shows mask shapes, value ranges, thresholding results"
+echo ""
+echo "Option 3: Check SAM_DEBUGGING_GUIDE.md"
+echo "  - Detailed explanation of common issues"
+echo "  - How to interpret debug output"
+echo "  - Suggested fixes for each type of failure"
+echo ""
+echo "Common issues:"
+echo "  • Frame 0 has predictions, Frames 1+ are empty"
+echo "    → SAM2 not using temporal tracking (frame-by-frame processing)"
+echo "  • All frames empty with valid clicks generated"
+echo "    → SAM model not returning valid masks"
+echo "  • Dice scores vary wildly"
+echo "    → Click generation or SAM configuration issue"
+echo ""
 echo "========================================"
 
 # ===========================
