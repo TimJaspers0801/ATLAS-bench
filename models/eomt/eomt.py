@@ -160,13 +160,13 @@ class EoMT(nn.Module):
         """
         Args:
             x: tensor (B, C, H, W).
-            return_semantic: if True, additionally returns seg_map [B, num_classes, H, W]
+            return_semantic: if True, returns per-pixel class logits [B, num_classes, H, W]
                 computed from the last-layer mask & class logits (upsampled to the input size).
         Returns:
             if return_semantic:
-                seg_map (B, num_classes, H, W), cls_logits (B, num_cls_classes)
+                seg_map (B, num_classes, H, W)
             else:
-                mask_logits_per_layer, class_logits_per_layer
+                (mask_logits_per_layer, class_logits_per_layer)
         """
         # remember original spatial size
         orig_size = (x.shape[-2], x.shape[-1])
@@ -234,10 +234,7 @@ class EoMT(nn.Module):
             seg_map = self.to_per_pixel_logits_semantic(
                 upsampled_mask_logits, class_logits_per_layer[-1]
             )  # [B, num_classes, H, W]
-
-
             return seg_map
-
 
         return mask_logits_per_layer, class_logits_per_layer
 

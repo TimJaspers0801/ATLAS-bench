@@ -225,26 +225,29 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         print(f"Loading EOMT checkpoint: {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
         
-        # EOMT checkpoints are already the state dict (not wrapped in a dict with 'model' key)
+        # Extract state dict from checkpoint
         if isinstance(checkpoint, dict) and "model" in checkpoint:
             state_dict = checkpoint["model"]
         else:
             state_dict = checkpoint
         
-        # Strip "network." prefix if present (from Lightning module checkpoints)
+        # Transform keys from checkpoint format to model format
         new_state_dict = {}
         for key, value in state_dict.items():
-            if key.startswith("network."):
-                new_key = key[len("network."):]
-            else:
-                new_key = key
+            # Remove criterion keys
+            if key.startswith("criterion."):
+                continue
+            
+            # Strip "network." prefix
+            new_key = key.replace("network.", "", 1) if key.startswith("network.") else key
+            
+            # Map TIMM-like naming to HuggingFace format used by the model
+            # patch_embed -> embeddings
+            new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
+            # blocks -> layer
+            new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
             
             new_state_dict[new_key] = value
-        
-        # Remove criterion keys if present
-        keys_to_remove = [k for k in new_state_dict.keys() if k.startswith("criterion.")]
-        for key in keys_to_remove:
-            del new_state_dict[key]
         
         msg = model.load_state_dict(new_state_dict, strict=False)
         print(msg)
