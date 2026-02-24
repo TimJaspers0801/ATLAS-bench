@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 
-from models.scale_block import ScaleBlock
+from .scale_block import ScaleBlock
 
 
 class Atlas(nn.Module):
@@ -218,7 +218,7 @@ class Atlas(nn.Module):
         prev_query_embed: Optional[torch.Tensor] = None,
         return_query_embedding: bool = False,
     ):
-        x = (x - self.encoder.pixel_mean) / self.encoder.pixel_std
+        # x = (x - self.encoder.pixel_mean) / self.encoder.pixel_std
 
         rope = None
         if hasattr(self.encoder.backbone, "rope_embeddings"):
