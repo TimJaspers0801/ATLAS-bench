@@ -539,6 +539,7 @@ def atlas_vitb_dinov2(
     encoder = ViT(
         img_size=(336, 336),
         backbone_name="vit_base_patch14_dinov2.lvd142m",
+        patch_size=14
     )
     
     model = Atlas(
