@@ -48,11 +48,10 @@ class CholecSeg8kDataset(Dataset):
     Zip-based CholecSeg8k dataset (no predefined splits).
 
         Dataset structure in zip (original):
-        - cholecseg8k/
-            - video{nb}/
-                - video{nb}_{clip_nb}/
-                    - frame_{framenum}_endo.png
-                    - frame_{framenum}_endo_mask.png
+        - video{nb}/
+            - video{nb}_{clip_nb}/
+                - frame_{framenum}_endo.png
+                - frame_{framenum}_endo_mask.png
 
         Frames and masks live in the same clip folder and are paired by filename.
     """
@@ -124,9 +123,9 @@ class CholecSeg8kDataset(Dataset):
             if not file.lower().endswith("_endo.png"):
                 continue
 
-            # Expect path like: cholecseg8k/videoXX/videoXX_YY/frame_000000_endo.png
+            # Expect path like: videoXX/videoXX_YY/frame_000000_endo.png
             parts = file.split("/")
-            if len(parts) < 4:
+            if len(parts) < 3:
                 continue
 
             video_folder = parts[-3]
