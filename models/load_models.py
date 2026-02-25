@@ -103,11 +103,12 @@ def load_dinov1_b():
 def load_dinov2_s(img_size=518):
     if isinstance(img_size, int):
         img_size = (img_size, img_size)
-    model = timm.create_model(
-        'vit_small_patch14_dinov2',
+    # Wrap in ViT class to handle get_intermediate_layers properly
+    from models.decoders.vit import ViT
+    model = ViT(
         img_size=img_size,
         patch_size=14,
-        num_classes=0,
+        backbone_name='vit_small_patch14_dinov2',
     )
     return model
 
@@ -115,11 +116,12 @@ def load_dinov2_s(img_size=518):
 def load_dinov2_b(img_size=518):
     if isinstance(img_size, int):
         img_size = (img_size, img_size)
-    model = timm.create_model(
-        'vit_base_patch14_dinov2',
+    # Wrap in ViT class to handle get_intermediate_layers properly
+    from models.decoders.vit import ViT
+    model = ViT(
         img_size=img_size,
         patch_size=14,
-        num_classes=0,
+        backbone_name='vit_base_patch14_dinov2',
     )
     return model
 
@@ -127,11 +129,12 @@ def load_dinov2_b(img_size=518):
 def load_dinov2_l(img_size=518):
     if isinstance(img_size, int):
         img_size = (img_size, img_size)
-    model = timm.create_model(
-        'vit_large_patch14_dinov2',
+    # Wrap in ViT class to handle get_intermediate_layers properly
+    from models.decoders.vit import ViT
+    model = ViT(
         img_size=img_size,
         patch_size=14,
-        num_classes=0,
+        backbone_name='vit_large_patch14_dinov2',
     )
     return model
 
@@ -326,33 +329,36 @@ def load_lh_dinov1_vitb_224_surgenet2m(n_classes):
 
 # DINOv2 - ViT-Base 336 (SurgeNet2M)
 def load_dinov2_vitb_336_surgenet2m():
-    model = timm.create_model(
-        "vit_base_patch14_dinov2.lvd142m",
+    from models.decoders.vit import ViT
+    
+    model = ViT(
         img_size=(336, 336),
         patch_size=14,
-        num_classes=0,
-        pretrained=False,
+        backbone_name='vit_base_patch14_dinov2.lvd142m',
     )
+    
     weight_path = os.path.join(os.getcwd(), "weights", "DINOv2-vitb-336-surgenet2M.pth")
-    state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+    if os.path.isfile(weight_path):
+        state_dict = torch.load(weight_path, map_location="cpu", weights_only=False)
+        
+        # Unwrap checkpoint if it has wrapper keys
+        if isinstance(state_dict, dict):
+            if "teacher" in state_dict:
+                state_dict = state_dict["teacher"]
+            elif "model" in state_dict:
+                state_dict = state_dict["model"]
+            elif "state_dict" in state_dict:
+                state_dict = state_dict["state_dict"]
+        
+        # Strip common prefixes
+        if any(key.startswith("module.") for key in state_dict.keys()):
+            state_dict = {key[len("module."):]: value for key, value in state_dict.items()}
+        if any(key.startswith("backbone.") for key in state_dict.keys()):
+            state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
+        
+        msg = model.backbone.load_state_dict(state_dict, strict=False)
+        print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     
-    # Unwrap checkpoint if it has wrapper keys
-    if isinstance(state_dict, dict):
-        if "teacher" in state_dict:
-            state_dict = state_dict["teacher"]
-        elif "model" in state_dict:
-            state_dict = state_dict["model"]
-        elif "state_dict" in state_dict:
-            state_dict = state_dict["state_dict"]
-    
-    # Strip common prefixes
-    if any(key.startswith("module.") for key in state_dict.keys()):
-        state_dict = {key[len("module."):]: value for key, value in state_dict.items()}
-    if any(key.startswith("backbone.") for key in state_dict.keys()):
-        state_dict = {key[len("backbone."):]: value for key, value in state_dict.items()}
-    
-    msg = model.load_state_dict(state_dict, strict=False)
-    print(f"\nLoaded DINOv2 ViT-Base 336 SurgeNet2M weights with msg:\n{msg}")
     return model
 
 def load_lh_dinov2_vitb_336_surgenet2m(n_classes):

@@ -39,7 +39,12 @@ def count_parameters(model):
     return total_params, trainable_params
 
 
-def measure_fps(model, device, img_size, batch_size=1, warmup_iters=50, test_iters=200):
+def _synchronize(device):
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+
+
+def measure_fps(model, device, img_size, batch_size=1, warmup_iters=200, test_iters=10000):
     """
     Measure FPS (Frames Per Second) for online inference.
     
@@ -56,6 +61,7 @@ def measure_fps(model, device, img_size, batch_size=1, warmup_iters=50, test_ite
         latency_ms: Average latency in milliseconds per frame
     """
     model.eval()
+    torch.backends.cudnn.benchmark = True
     
     # Create dummy input
     dummy_input = torch.randn(batch_size, 3, img_size, img_size, device=device)
@@ -65,34 +71,40 @@ def measure_fps(model, device, img_size, batch_size=1, warmup_iters=50, test_ite
     
     # Warmup
     print(f"  Warming up ({warmup_iters} iterations)...")
-    with torch.no_grad():
+    with torch.inference_mode():
         for _ in range(warmup_iters):
             if is_atlas:
                 _ = model(dummy_input, prev_query_embed=None, return_query_embedding=False)
             else:
                 _ = model(dummy_input)
     
-    # Synchronize GPU
-    if device.type == 'cuda':
-        torch.cuda.synchronize()
+    _synchronize(device)
     
     # Measure inference time
     print(f"  Benchmarking ({test_iters} iterations)...")
     times = []
-    with torch.no_grad():
-        for _ in range(test_iters):
-            start_time = time.time()
-            
-            if is_atlas:
-                _ = model(dummy_input, prev_query_embed=None, return_query_embedding=False)
-            else:
-                _ = model(dummy_input)
-            
-            if device.type == 'cuda':
-                torch.cuda.synchronize()
-            
-            end_time = time.time()
-            times.append(end_time - start_time)
+    with torch.inference_mode():
+        if device.type == "cuda":
+            start_event = torch.cuda.Event(enable_timing=True)
+            end_event = torch.cuda.Event(enable_timing=True)
+            for _ in range(test_iters):
+                start_event.record()
+                if is_atlas:
+                    _ = model(dummy_input, prev_query_embed=None, return_query_embedding=False)
+                else:
+                    _ = model(dummy_input)
+                end_event.record()
+                _synchronize(device)
+                times.append(start_event.elapsed_time(end_event) / 1000.0)
+        else:
+            for _ in range(test_iters):
+                start_time = time.perf_counter()
+                if is_atlas:
+                    _ = model(dummy_input, prev_query_embed=None, return_query_embedding=False)
+                else:
+                    _ = model(dummy_input)
+                end_time = time.perf_counter()
+                times.append(end_time - start_time)
     
     # Calculate statistics
     times = np.array(times)
@@ -182,7 +194,16 @@ def estimate_flops(model, img_size, batch_size=1):
     return gflops
 
 
-def benchmark_model(model_name, checkpoint_path, num_classes, img_size, device, output_file=None):
+def benchmark_model(
+    model_name,
+    checkpoint_path,
+    num_classes,
+    img_size,
+    device,
+    output_file=None,
+    warmup_iters=50,
+    test_iters=200,
+):
     """
     Benchmark a single model.
     
@@ -232,7 +253,14 @@ def benchmark_model(model_name, checkpoint_path, num_classes, img_size, device, 
     # Measure FPS
     print("\nMeasuring FPS (batch_size=1, online inference)...")
     try:
-        fps, latency_ms = measure_fps(model, device, img_size, batch_size=1)
+        fps, latency_ms = measure_fps(
+            model,
+            device,
+            img_size,
+            batch_size=1,
+            warmup_iters=warmup_iters,
+            test_iters=test_iters,
+        )
     except Exception as e:
         print(f"  Error measuring FPS: {e}")
         fps, latency_ms = None, None
@@ -488,6 +516,18 @@ def main():
         help="Path to save results JSON"
     )
     parser.add_argument(
+        "--warmup_iters",
+        type=int,
+        default=50,
+        help="Number of warmup iterations"
+    )
+    parser.add_argument(
+        "--test_iters",
+        type=int,
+        default=200,
+        help="Number of benchmark iterations"
+    )
+    parser.add_argument(
         "--benchmark_all",
         action="store_true",
         help="Benchmark all models from test_atlas.sh"
@@ -520,7 +560,9 @@ def main():
             num_classes=args.num_classes,
             img_size=img_size,
             device=device,
-            output_file=args.output
+            output_file=args.output,
+            warmup_iters=args.warmup_iters,
+            test_iters=args.test_iters,
         )
 
 
