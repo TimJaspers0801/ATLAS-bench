@@ -76,8 +76,8 @@ MODELS=(
     
     # ATLAS models (temporal)
     # "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0|32"
-    "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|32"
-    "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|32"
+    # "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|32"
+    # "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|32"
     "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|32"
 
     # # EOMT SurgeNet models
