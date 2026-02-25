@@ -48,7 +48,7 @@ EPOCHS=10
 NUM_CLASSES=30
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
-LR=1e-4
+LR=1e-6
 SEEDS=(0)
 
 
@@ -60,7 +60,7 @@ BATCH_SIZE=32
 
 WANDB_GROUP=lh_vitl_dinov2_atlas
 for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=lh_vitl_dinov2_atlas_seed${SEED}
+  EXPERIMENT_NAME=lh_vitl_dinov2_atlas_lwlr_seed${SEED}
 
   echo "========================================"
   echo "Running ${EXPERIMENT_NAME}"
@@ -87,74 +87,73 @@ for SEED in "${SEEDS[@]}"; do
 done
 
 
-# ===========================
-# Experiment — LH DINOv2 - b
-# ===========================
+# # ===========================
+# # Experiment — LH DINOv2 - b
+# # ===========================
 
-BATCH_SIZE=64
-WANDB_GROUP=lh_vitb_dinov2_atlas
+# BATCH_SIZE=64
+# WANDB_GROUP=lh_vitb_dinov2_atlas
 
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=lh_vitb_dinov2_atlas_seed${SEED}
+# for SEED in "${SEEDS[@]}"; do
+#   EXPERIMENT_NAME=lh_vitb_dinov2_atlas_seed${SEED}
 
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
+#   echo "========================================"
+#   echo "Running ${EXPERIMENT_NAME}"
+#   echo "========================================"
 
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model lh-vit-b-dinov2 \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --lr ${LR} \
-      --visualize
-done
+#   srun apptainer exec --nv \
+#     --bind ${PROJECT_ROOT}:/workspace \
+#     --bind ${OUTPUT_ROOT_HOST}:/outputs \
+#     ${CONTAINER} \
+#     python3 /workspace/train_frame_level.py \
+#       --data_path ${DATA_ZIP} \
+#       --experiment_name ${EXPERIMENT_NAME} \
+#       --model lh-vit-b-dinov2 \
+#       --num_classes ${NUM_CLASSES} \
+#       --epochs ${EPOCHS} \
+#       --batch_size ${BATCH_SIZE} \
+#       --img_size ${IMG_SIZE} \
+#       --output_dir ${OUTPUT_PATH} \
+#       --num_workers ${NUM_WORKERS} \
+#       --seed ${SEED} \
+#       --wandb_group ${WANDB_GROUP} \
+#       --lr ${LR} \
+#       --visualize
+# done
 
-# ===========================
-# Experiment — LH DINOv2 - s
-# ===========================
+# # ===========================
+# # Experiment — LH DINOv2 - s
+# # ===========================
 
-IMG_SIZE=224
-BATCH_SIZE=128
-WANDB_GROUP=lh_vits_dinov2_atlas
+# BATCH_SIZE=128
+# WANDB_GROUP=lh_vits_dinov2_atlas
 
-for SEED in "${SEEDS[@]}"; do
-  EXPERIMENT_NAME=lh_vits_dinov2_atlas_seed${SEED}
+# for SEED in "${SEEDS[@]}"; do
+#   EXPERIMENT_NAME=lh_vits_dinov2_atlas_seed${SEED}
 
-  echo "========================================"
-  echo "Running ${EXPERIMENT_NAME}"
-  echo "========================================"
+#   echo "========================================"
+#   echo "Running ${EXPERIMENT_NAME}"
+#   echo "========================================"
 
-  srun apptainer exec --nv \
-    --bind ${PROJECT_ROOT}:/workspace \
-    --bind ${OUTPUT_ROOT_HOST}:/outputs \
-    ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
-      --data_path ${DATA_ZIP} \
-      --experiment_name ${EXPERIMENT_NAME} \
-      --model lh-vit-s-dinov2 \
-      --num_classes ${NUM_CLASSES} \
-      --epochs ${EPOCHS} \
-      --batch_size ${BATCH_SIZE} \
-      --img_size ${IMG_SIZE} \
-      --output_dir ${OUTPUT_PATH} \
-      --num_workers ${NUM_WORKERS} \
-      --seed ${SEED} \
-      --wandb_group ${WANDB_GROUP} \
-      --lr ${LR} \
-      --visualize
-done
+#   srun apptainer exec --nv \
+#     --bind ${PROJECT_ROOT}:/workspace \
+#     --bind ${OUTPUT_ROOT_HOST}:/outputs \
+#     ${CONTAINER} \
+#     python3 /workspace/train_frame_level.py \
+#       --data_path ${DATA_ZIP} \
+#       --experiment_name ${EXPERIMENT_NAME} \
+#       --model lh-vit-s-dinov2 \
+#       --num_classes ${NUM_CLASSES} \
+#       --epochs ${EPOCHS} \
+#       --batch_size ${BATCH_SIZE} \
+#       --img_size ${IMG_SIZE} \
+#       --output_dir ${OUTPUT_PATH} \
+#       --num_workers ${NUM_WORKERS} \
+#       --seed ${SEED} \
+#       --wandb_group ${WANDB_GROUP} \
+#       --lr ${LR} \
+#       --visualize
+# done
 
 
 
