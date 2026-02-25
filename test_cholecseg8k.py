@@ -437,9 +437,8 @@ def save_random_visualizations(
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
             
-            # Apply class mapping to ground truth
-            if apply_class_mapping:
-                gt_masks = map_atlas_to_cholecseg8k(gt_masks)
+            # GT masks are already in correct CholecSeg8K format (0-12) from dataset
+            # No mapping needed for GT masks
             
             # Get clip info
             procedure = batch["procedure"][0] if isinstance(batch["procedure"], list) else batch["procedure"]
@@ -827,7 +826,8 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
             # Squeeze preds to (B, H, W) for mapping
             preds_2d = preds.squeeze(1)
             preds_mapped = map_atlas_to_cholecseg8k(preds_2d)
-            gt_masks_mapped = map_atlas_to_cholecseg8k(gt_masks)
+            # GT masks are already in correct CholecSeg8K format (0-12) from dataset
+            gt_masks_mapped = gt_masks
             
             # Apply evaluation-specific remapping (currently no-op)
             preds_mapped, gt_masks_mapped = apply_evaluation_mapping(preds_mapped, gt_masks_mapped)

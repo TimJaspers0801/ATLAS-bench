@@ -36,7 +36,7 @@ CHOLECSEG8K_MAPPING = {
     6: 6,   # Connective Tissue
     7: 7,   # Blood
     8: 8,   # Cystic Duct
-    9: 9,   # L-hook Electrocautery
+    9: 5,   # L-hook Electrocautery -> Grasper (both surgical tools)
     10: 10, # Gallbladder
     11: 11, # Hepatic Vein
     12: 12, # Liver Ligament
@@ -52,7 +52,7 @@ COLOR_CLASS_MAPPING = {
     (255, 85, 0): 6,     # Connective Tissue
     (255, 0, 0): 7,      # Blood
     (255, 255, 0): 8,    # Cystic Duct
-    (169, 255, 184): 9,  # L-hook Electrocautery
+    (169, 255, 184): 5,  # L-hook Electrocautery -> Grasper (both surgical tools)
     (255, 160, 165): 10, # Gallbladder
     (0, 50, 128): 11,    # Hepatic Vein
     (111, 74, 0): 12,    # Liver Ligament
