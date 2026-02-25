@@ -18,7 +18,8 @@ from models.load_models import load_surgenet_caformer_s18, load_surgenet_convnex
                                load_lh_vit_s_dinov3, load_lh_vit_b_dinov3, load_lh_vit_l_dinov3, \
                                load_endofm, load_endovit, load_lh_gastronet5m, \
                                load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m, \
-                               load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
+                               load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m, \
+                               load_sam2unet
 from evaluation.dataset_evaluation import evaluate_model
 from evaluation.visual_logging import collect_visual_grids
 import numpy as np
@@ -64,7 +65,7 @@ def train(args):
     # Determine normalization type based on model
     # DINO models (v1, v2, v3) use ImageNet normalization
     # Other models use no normalization by default (they have their own)
-    if any(x in args.model.lower() for x in ['dinov1', 'dinov2', 'dinov3', 'vit']):
+    if any(x in args.model.lower() for x in ['dinov1', 'dinov2', 'dinov3', 'vit', 'sam2']):
         normalization_type = "imagenet"
     else:
         normalization_type = "none"
@@ -173,6 +174,8 @@ def train(args):
         model = load_endofm(num_classes=args.num_classes, device=device)
     elif args.model == 'endovit':
         model = load_endovit(num_classes=args.num_classes)
+    elif args.model == 'sam2unet':
+        model = load_sam2unet(num_classes=args.num_classes, checkpoint_path=args.checkpoint)
     else:
         raise ValueError(
             f"Model {args.model} not recognized. Available models:\n"
@@ -184,7 +187,7 @@ def train(args):
             "  - lh-dinov2-vitb-336-surgenet2m\n"
             "  - lh-dinov3-vitb-256-surgenet2m (requires DINOv3-vitb-256-surgenet2M.pth)\n"
             "  - lh-dinov3-vitl-256-surgenet2m (requires DINOv3-vitl-256-surgenet2M.pth)\n"
-            "  - endofm, endovit"
+            "  - endofm, endovit, sam2unet"
         )
 
     if args.checkpoint:

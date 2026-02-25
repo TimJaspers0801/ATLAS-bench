@@ -8,6 +8,7 @@ from models.surgenet import pvtv2
 from models.surgenet import metaformer
 from models.decoders.vit import ViTSegmenter, ViT
 from models.GastroNet5M import vit_base_14
+from models.SAM2UNet import SAM2UNet
 
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
@@ -298,6 +299,15 @@ def load_lh_gastronet5m(n_classes):
         vit_model=vit,
         decoder_name="linear",
         num_classes=n_classes)
+    return model
+
+
+###########################################
+### SAM2-UNet model ###
+###########################################
+
+def load_sam2unet(num_classes=1, checkpoint_path=None):
+    model = SAM2UNet(num_classes=num_classes, checkpoint_path=checkpoint_path)
     return model
 
 
