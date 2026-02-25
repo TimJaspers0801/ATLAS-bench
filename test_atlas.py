@@ -39,7 +39,8 @@ from models.load_models import (
     load_surgenet_caformer_s18, load_surgenet_convnextv2_tiny, load_surgenet_pvtv2_b2,
     load_endofm, load_endovit, load_lh_gastronet5m,
     load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m,
-    load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
+    load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m,
+    load_sam2unet, load_sam3unet
 )
 from evaluation.dataset_evaluation import evaluate_model
 from evaluation.visual_logging import apply_mask_overlay, denormalize
@@ -81,6 +82,10 @@ MODEL_REGISTRY = {
     "endofm": load_endofm,
     "endovit": load_endovit,
     "gastronet5m": load_lh_gastronet5m,
+    
+    # SAM2-UNet and SAM3-UNet
+    "sam2unet": load_sam2unet,
+    "sam3unet": load_sam3unet,
 }
 
 # Image size mapping
@@ -106,9 +111,21 @@ def get_image_size(model_name: str) -> int:
     if "atlas" in model_name and "dinov2" in model_name:
         return 336
     
+    # Special case: ATLAS DINOv3 models use 256x256
+    if "atlas" in model_name and "dinov3" in model_name:
+        return 256
+    
     # Special case: eomt_dinov2 models use 518x518
     if "eomt" in model_name and "dinov2" in model_name:
         return 518
+    
+    # SAM2-UNet uses 256x256
+    if "sam2unet" in model_name:
+        return 256
+    
+    # SAM3-UNet uses 336x336
+    if "sam3unet" in model_name:
+        return 336
     
     # Check for 518 in model name (explicit size specification)
     if "518" in model_name:

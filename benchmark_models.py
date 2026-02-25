@@ -334,6 +334,10 @@ def parse_test_atlas_models():
         ("atlas_vitb_dinov3", "best_model.pth", "atlas_vitb_dinov3_surgenet", 0, 32),
         ("atlas_vits_dinov3", "best_model.pth", "atlas_vits_dinov3_surgenet", 0, 32),
         ("atlas_vitl_dinov3_tracking", "best_model.pth", "atlas_vitl_dinov3_tracking_surgenet", 0, 32),
+        
+        # ATLAS DINOv1 and DINOv2 models
+        ("atlas_vitb_dinov2", "best_model.pth", "atlas_vitb_dinov2_surgenet_336", 0, 32),
+        ("atlas_vitb_dinov1", "best_model.pth", "atlas_vitb_dinov1_surgenet_224", 0, 32),
 
         # EOMT SurgeNet models
         ("eomt_vitl_dinov3", "best_model.pth", "eomt_dinov3_vitl_surgenet_256", 0, 32),
@@ -352,6 +356,10 @@ def parse_test_atlas_models():
         ("endofm", "best_model.pth", "endofm_atlas", 0, 32),
         ("endovit", "best_model.pth", "endovit_atlas", 0, 32),
         ("gastronet5m", "best_model.pth", "lh_gastronet5m_atlas", 0, 32),
+        
+        # SAM2-UNet and SAM3-UNet
+        ("sam2unet", "best_model.pth", "sam2unet_atlas", 0, 32),
+        ("sam3unet", "best_model.pth", "sam3unet_atlas", 0, 32),
     ]
     
     return models_config

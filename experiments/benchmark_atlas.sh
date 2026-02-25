@@ -77,6 +77,10 @@ MODELS=(
     "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0"
     "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0"
 
+    # atlas dinov1 and dinov2
+    "atlas_vitb_dinov2|best_model.pth|atlas_vitb_dinov2_surgenet_336|0"
+    "atlas_vitb_dinov1|best_model.pth|atlas_vitb_dinov1_surgenet_224|0"
+
     # EOMT SurgeNet models
     "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0"
 
@@ -94,6 +98,12 @@ MODELS=(
     "endofm|best_model.pth|endofm_atlas|0"
     "endovit|best_model.pth|endovit_atlas|0"
     "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0"
+
+    # SAM2-UNet 
+    "sam2unet|best_model.pth|sam2unet_atlas|0"
+    # SAM3-UNet 
+    "sam3unet|best_model.pth|sam3unet_atlas|0"
+
 )
 
 # ===========================
