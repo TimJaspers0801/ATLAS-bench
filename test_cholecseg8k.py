@@ -653,7 +653,7 @@ def main(args):
     print(f"\nEvaluating on CholecSeg8K ({len(dataset)} frames)...")
     print("Class mapping pipeline:")
     print("  1. ATLAS 30 classes → CholecSeg8K 13 classes")
-    print("  2. Evaluate on classes 1-6, 8-11 (background, blood, liver ligament excluded)")
+    print("  2. Evaluate on classes 1-5, 8-11 (background, connective tissue, blood, liver ligament excluded)")
 
     # Custom evaluation with class mapping
     metrics = evaluate_model_with_mapping(
@@ -696,8 +696,8 @@ def main(args):
             "dataset": "CholecSeg8K (full dataset)",
             "num_frames": len(dataset),
             "class_mapping": "ATLAS 30 classes -> CholecSeg8K 13 classes",
-            "evaluation_classes": "1-6, 8-11 (foreground classes)",
-            "excluded_classes": "0 (Background), 7 (Blood), 12 (Liver Ligament)",
+            "evaluation_classes": "1-5, 8-11 (foreground classes)",
+            "excluded_classes": "0 (Background), 6 (Connective Tissue), 7 (Blood), 12 (Liver Ligament)",
             "metrics": {
                 "mIoU": float(metrics["mIoU"]),
                 "Dice": float(metrics["Dice"]),
@@ -727,7 +727,7 @@ def apply_evaluation_mapping(pred_masks, gt_masks):
 def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, num_cholecseg8k_classes, is_atlas=False):
     """
     Evaluate model with class mapping from ATLAS to CholecSeg8K.
-    Evaluates foreground classes (1-6, 8-11) and excludes background (0), blood (7), and liver ligament (12).
+    Evaluates foreground classes (1-5, 8-11) and excludes background (0), connective tissue (6), blood (7), and liver ligament (12).
     """
     from evaluation.metrics import compute_class_metrics, SegmentationAPEvaluator
     
@@ -833,8 +833,8 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
             preds_mapped, gt_masks_mapped = apply_evaluation_mapping(preds_mapped, gt_masks_mapped)
             
             # Compute metrics for each image in batch
-            # Evaluate foreground classes (exclude background 0, blood 7, liver ligament 12)
-            classes_to_eval = [c for c in range(1, num_cholecseg8k_classes) if c not in [7, 12]]
+            # Evaluate foreground classes (exclude background 0, connective tissue 6, blood 7, liver ligament 12)
+            classes_to_eval = [c for c in range(1, num_cholecseg8k_classes) if c not in [6, 7, 12]]
             
             for i in range(len(images)):
                 # --- AP Handling ---
@@ -927,7 +927,7 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
     print(f"{'OVERALL':<15} | {mIoU:.4f}     | {mDice:.4f}")
     print(f"{'mAP':<15} | {AP_total:.4f}")
     print("=" * 60)
-    print("Note: Background (0), Blood (7), and Liver Ligament (12) excluded from evaluation")
+    print("Note: Background (0), Connective Tissue (6), Blood (7), and Liver Ligament (12) excluded from evaluation")
     print()
     
     return {
