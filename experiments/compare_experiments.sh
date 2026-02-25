@@ -121,7 +121,17 @@ for clip_folder in ${CLIP_GLOB}; do
         --pwd /workspace \
         ${CONTAINER} \
         python3 compare_experiments.py \
-      Dataset ${DATASET} complete!"
+            --clip_dir "${clip_folder}" \
+            --experiments "${EXPERIMENTS[@]}" \
+            --output_dir "${output_dir}"
+    
+    if [ $? -eq 0 ]; then
+        processed_count=$((processed_count + 1))
+    fi
+done
+
+echo ""
+echo "Dataset ${DATASET} complete!"
 echo "Processed: ${processed_count}/${clip_count} clips"
 echo "Output root: ${OUTPUT_ROOT}"
 echo ""
@@ -130,15 +140,5 @@ done  # End dataset loop
 
 echo ""
 echo "========================================"
-echo "All comparisons complete!
-    if [ $? -eq 0 ]; then
-        processed_count=$((processed_count + 1))
-    fi
-done
-
-echo ""
-echo "========================================"
-echo "Comparison complete!"
-echo "Processed: ${processed_count}/${clip_count} clips"
-echo "Output root: ${OUTPUT_ROOT}"
-echo "========================================"
+echo "All comparisons complete!"
+echo "======================================"
