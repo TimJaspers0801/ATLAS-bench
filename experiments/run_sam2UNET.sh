@@ -48,7 +48,7 @@ NUM_CLASSES=30
 NUM_WORKERS=16
 FRAMES_PERCENTAGE=100
 SEEDS=(0)
-SAM2_CKPT=/gpfs/work5/0/tesr0602/Tim/weights/sam2_hiera_large.pt
+SAM2_CKPT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/weights/sam2_hiera_large.pt
 
 # ===========================
 # Experiment — SAM2-UNet
