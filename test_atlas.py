@@ -221,9 +221,26 @@ def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: 
     print(f"Loading ATLAS model: {model_name}")
     model = atlas_loaders[model_name](num_classes=num_classes)
     
-    if checkpoint_path and os.path.isfile(checkpoint_path):
+    if checkpoint_path:
+        if not os.path.isfile(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_path}")
+        
         print(f"Loading ATLAS checkpoint: {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+        except RuntimeError as e:
+            if "PytorchStreamReader failed" in str(e) or "zip archive" in str(e):
+                file_size = os.path.getsize(checkpoint_path)
+                raise RuntimeError(
+                    f"Checkpoint file is corrupted or invalid: {checkpoint_path}\n"
+                    f"File size: {file_size} bytes\n"
+                    f"This typically means:\n"
+                    f"  - The file download was incomplete\n"
+                    f"  - The file was corrupted during transfer\n"
+                    f"  - The file is not a valid PyTorch checkpoint\n"
+                    f"Original error: {e}"
+                ) from e
+            raise
         
         # Extract state dict from checkpoint
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
