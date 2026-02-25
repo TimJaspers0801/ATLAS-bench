@@ -1,4 +1,5 @@
 import os
+import importlib.util
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -308,6 +309,26 @@ def load_lh_gastronet5m(n_classes):
 def load_sam2unet(num_classes=1, checkpoint_path=None):
     from models.SAM2UNet.SAM2UNet import SAM2UNet
     model = SAM2UNet(num_classes=num_classes, checkpoint_path=checkpoint_path)
+    return model
+
+
+###########################################
+### SAM3-UNet model ###
+###########################################
+
+def load_sam3unet(num_classes=1, checkpoint_path=None, img_size=336):
+    module_path = os.path.join(
+        os.path.dirname(__file__), "SAM3-UNet", "SAM3UNet.py"
+    )
+    spec = importlib.util.spec_from_file_location("sam3unet_module", module_path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    spec.loader.exec_module(module)
+    model = module.SAM3UNet(
+        checkpoint_path=checkpoint_path,
+        img_size=img_size,
+        num_classes=num_classes,
+    )
     return model
 
 

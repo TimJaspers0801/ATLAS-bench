@@ -125,7 +125,7 @@ def _create_vit_backbone(img_size):
 
 
 class SAM3UNet(nn.Module):
-    def __init__(self, checkpoint_path=None, img_size=336) -> None:
+    def __init__(self, checkpoint_path=None, img_size=336, num_classes=1) -> None:
         super(SAM3UNet, self).__init__()
         self.sam3_vit = _create_vit_backbone(img_size)
         if checkpoint_path:
@@ -153,7 +153,7 @@ class SAM3UNet(nn.Module):
         self.up2 = Up(256, 128)
         self.up3 = Up(256, 128)
         self.up4 = Up(128, 128)
-        self.head = nn.Conv2d(128, 1, 1)
+        self.head = nn.Conv2d(128, num_classes, 1)
         
     def forward(self, x):
         B, C, H, W = x.shape
