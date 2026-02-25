@@ -166,6 +166,8 @@ for model_config in "${MODELS[@]}"; do
             --model ${MODEL_NAME} \
             ${CHECKPOINT_ARG} \
             --num_classes ${NUM_CLASSES} \
+            --warmup_iters 200 \
+            --test_iters 10000 \
             --output ${RESULT_FILE}
     
     if [ $? -eq 0 ]; then
