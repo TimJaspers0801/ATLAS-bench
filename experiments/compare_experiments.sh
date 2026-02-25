@@ -20,6 +20,7 @@ echo "========================================"
 # ===========================
 
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
+CONTAINER=${PROJECT_ROOT}/atlasv2.sif
 
 DATASET=${1:-atlas}  # atlas | cholecseg8k
 
@@ -99,10 +100,14 @@ for clip_folder in ${VISUALIZATIONS_ROOT}/*/*/*; do
     fi
     
     # Run comparison
-    python3 compare_experiments.py \
-        --clip_dir "${clip_folder}" \
-        --experiments "${EXPERIMENTS[@]}" \
-        --output_dir "${output_dir}"
+    apptainer exec --nv \
+        --bind ${PROJECT_ROOT}:/workspace \
+        --pwd /workspace \
+        ${CONTAINER} \
+        python3 compare_experiments.py \
+            --clip_dir "${clip_folder}" \
+            --experiments "${EXPERIMENTS[@]}" \
+            --output_dir "${output_dir}"
     
     if [ $? -eq 0 ]; then
         processed_count=$((processed_count + 1))
