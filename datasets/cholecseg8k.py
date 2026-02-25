@@ -209,6 +209,9 @@ class CholecSeg8kDataset(Dataset):
             "mask": mask,
             "split": sample["split"],
             "filename": sample["filename"],
+            "procedure": "cholecseg8k",  # For compatibility with ATLAS evaluation
+            "video": self.split_folder,  # Use split folder as video identifier
+            "clip": self.clip_id,  # Single clip per split
         }
 
     def _remap_mask(self, mask):

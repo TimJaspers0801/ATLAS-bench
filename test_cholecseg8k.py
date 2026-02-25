@@ -33,7 +33,6 @@ import cv2
 from torch.utils.data import DataLoader, ConcatDataset
 from datasets.cholecseg8k import CholecSeg8kDataset
 import torchvision.transforms.v2 as T
-from torch import nn
 import torch.nn.functional as F
 
 from utils import load_checkpoint, color_palette
@@ -46,7 +45,6 @@ from models.load_models import (
     load_lh_dinov1_vitb_224_surgenet2m, load_lh_dinov2_vitb_336_surgenet2m,
     load_lh_dinov3_vitb_256_surgenet2m, load_lh_dinov3_vitl_256_surgenet2m
 )
-from evaluation.dataset_evaluation import evaluate_model
 from evaluation.visual_logging import apply_mask_overlay, denormalize
 import numpy as np
 
@@ -247,7 +245,6 @@ def map_atlas_to_cholecseg8k(pred_mask):
     Returns:
         Mapped tensor with CholecSeg8K class indices
     """
-    device = pred_mask.device
     mapped = torch.zeros_like(pred_mask)
     
     for atlas_class, cholecseg_class in ATLAS_TO_CHOLECSEG8K_MAPPING.items():
@@ -762,37 +759,49 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
     Evaluate model with class mapping from ATLAS to CholecSeg8K.
     Excludes Connective Tissue class (6) from evaluation.
     """
-    from evaluation.metrics import compute_metrics
-    
-    all_preds = []
-    all_gts = []
+    from evaluation.metrics import compute_class_metrics, SegmentationAPEvaluator
     
     model.eval()
     
+    ignore_index = 255
+    
+    # Track scores per class across the entire dataset
+    class_ious = defaultdict(list)
+    class_dices = defaultdict(list)
+    
+    # AP tracking
+    clip_ap = {}
+    current_clip_id = None
+    ap_evaluator = None
+    
     with torch.no_grad():
         prev_query_embed = None
-        current_clip = None
+        current_atlas_clip = None
         
         for batch in tqdm(test_loader, desc="Evaluating"):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
             
-            # Apply class mapping to ground truth (ATLAS 30 -> CholecSeg8K)
-            gt_masks = map_atlas_to_cholecseg8k(gt_masks)
-            
             if is_atlas:
                 # ATLAS with temporal query propagation
-                procedure = batch.get("procedure")
-                video = batch.get("video")
-                clip_id = batch.get("clip")
+                procedure_field = batch.get("procedure")
+                video_field = batch.get("video")
+                clip_field = batch.get("clip")
                 
-                if procedure is not None:
-                    clip_key = f"{procedure[0] if isinstance(procedure, list) else procedure}/"
-                    clip_key += f"{video[0] if isinstance(video, list) else video}/"
-                    clip_key += f"{clip_id[0] if isinstance(clip_id, list) else clip_id}"
+                if procedure_field is not None:
+                    if isinstance(procedure_field, (list, tuple)):
+                        procedure = procedure_field[0]
+                        video = video_field[0]
+                        clip_id = clip_field[0]
+                    else:
+                        procedure = procedure_field
+                        video = video_field
+                        clip_id = clip_field
                     
-                    if current_clip != clip_key:
-                        current_clip = clip_key
+                    clip_key = f"{procedure}/{video}/{clip_id}"
+                    
+                    if current_atlas_clip != clip_key:
+                        current_atlas_clip = clip_key
                         prev_query_embed = None
                 
                 # Get ATLAS predictions (30 classes)
@@ -810,59 +819,157 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
                 mask_logits = mask_logits_per_block[-1]
                 class_logits = class_logits_per_block[-1]
                 
-                # Convert to per-pixel logits
-                per_pixel_logits = torch.einsum(
+                # Convert to per-pixel logits (30-class output)
+                probs = torch.einsum(
                     "bqhw, bqc -> bchw",
                     mask_logits.sigmoid(),
                     class_logits.softmax(dim=-1)[..., :-1]
                 )
                 
                 # Resize to match GT
-                if per_pixel_logits.shape[-2:] != gt_masks.shape[-2:]:
-                    per_pixel_logits = F.interpolate(
-                        per_pixel_logits,
+                if probs.shape[-2:] != gt_masks.shape[-2:]:
+                    probs = F.interpolate(
+                        probs,
                         size=gt_masks.shape[-2:],
                         mode='bilinear',
                         align_corners=False
                     )
                 
-                preds = torch.argmax(per_pixel_logits, dim=1)
+                preds = torch.argmax(probs, dim=1, keepdim=True)
             else:
                 # Standard forward pass
                 outputs = model(images)
                 probs = torch.softmax(outputs, dim=1)
-                preds = torch.argmax(probs, dim=1)
+                
+                # Resize to match GT
+                if probs.shape[-2:] != gt_masks.shape[-2:]:
+                    probs = F.interpolate(
+                        probs,
+                        size=gt_masks.shape[-2:],
+                        mode='bilinear',
+                        align_corners=False
+                    )
+                
+                preds = torch.argmax(probs, dim=1, keepdim=True)
             
-            # Apply class mapping to predictions (ATLAS 30 -> CholecSeg8K)
-            preds = map_atlas_to_cholecseg8k(preds)
+            # Apply class mapping to predictions (ATLAS 30 -> CholecSeg8K 9)
+            # Squeeze preds to (B, H, W) for mapping
+            preds_2d = preds.squeeze(1)
+            preds_mapped = map_atlas_to_cholecseg8k(preds_2d)
+            gt_masks_mapped = map_atlas_to_cholecseg8k(gt_masks)
             
             # Apply evaluation-specific remapping (consolidate L-hook, exclude Connective Tissue)
-            preds, gt_masks = apply_evaluation_mapping(preds, gt_masks)
+            preds_mapped, gt_masks_mapped = apply_evaluation_mapping(preds_mapped, gt_masks_mapped)
             
-            # Collect predictions and ground truth
-            all_preds.append(preds.cpu().numpy())
-            all_gts.append(gt_masks.cpu().numpy())
+            # Compute metrics for each image in batch
+            # Classes to evaluate: 0-8 except 6 (Connective Tissue), but we skip background 0
+            classes_to_eval = [1, 2, 3, 4, 5, 8]  # Skip 0 (background), 6 (excluded), 7 (remapped to 5)
+            
+            for i in range(len(images)):
+                # --- AP Handling ---
+                # Get clip info for AP tracking (handle both list and single value cases)
+                procedure_field = batch.get("procedure")
+                video_field = batch.get("video")
+                clip_field = batch.get("clip")
+                
+                if isinstance(procedure_field, (list, tuple)):
+                    procedure = procedure_field[i]
+                    video = video_field[i]
+                    clip = clip_field[i]
+                else:
+                    procedure = procedure_field
+                    video = video_field
+                    clip = clip_field
+                
+                clip_id_str = f"{procedure}/{video}/{clip}"
+                
+                if current_clip_id != clip_id_str:
+                    if ap_evaluator is not None:
+                        clip_ap[current_clip_id] = ap_evaluator.evaluate()
+                    current_clip_id = clip_id_str
+                    ap_evaluator = SegmentationAPEvaluator()
+                
+                pred_np = preds_mapped[i].cpu().numpy()
+                gt_np = gt_masks_mapped[i].cpu().numpy()
+                
+                # --- Metric Collection ---
+                for c in classes_to_eval:
+                    iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c, ignore_index=ignore_index)
+                    
+                    if iou_c is not None:
+                        class_ious[c].append(iou_c)
+                        class_dices[c].append(dice_c)
+                
+                # Binary AP logic
+                gt_binary = (gt_np > 0).astype(np.uint8)
+                pred_binary = (pred_np > 0).astype(np.uint8)
+                
+                # Compute confidence score (we can't use probs directly since we mapped classes)
+                # Use a simple approach: count of foreground pixels as proxy
+                if pred_binary.sum() > 0:
+                    score = 0.9  # Default high confidence since we're using argmax
+                else:
+                    score = 0.1  # Low confidence for no predictions
+                
+                ap_evaluator.add_frame(gt_binary, pred_binary, score)
+        
+        # Final AP evaluation
+        if ap_evaluator is not None:
+            clip_ap[current_clip_id] = ap_evaluator.evaluate()
     
-    # Concatenate all predictions and ground truths
-    all_preds = np.concatenate(all_preds, axis=0)
-    all_gts = np.concatenate(all_gts, axis=0)
+    # --- FINAL DATASET AGGREGATION ---
+    final_per_class_iou = {}
+    final_per_class_dice = {}
     
-    # Compute metrics on CholecSeg8K (9 classes total, but class 6 is excluded)
-    # We still use 9 classes so the class indices remain consistent
-    metrics = compute_metrics(all_gts, all_preds, num_classes=num_cholecseg8k_classes)
+    for c in classes_to_eval:
+        if len(class_ious[c]) > 0:
+            final_per_class_iou[c] = np.mean(class_ious[c])
+            final_per_class_dice[c] = np.mean(class_dices[c])
+        else:
+            final_per_class_iou[c] = 0.0
+            final_per_class_dice[c] = 0.0
+    
+    # The Final Mean Scores
+    mIoU = np.mean(list(final_per_class_iou.values()))
+    mDice = np.mean(list(final_per_class_dice.values()))
+    
+    # AP Metrics
+    AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
+    AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
+    AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
     
     print(f"\nMetrics (CholecSeg8K - Evaluation Classes):")
-    print(f"  Classes: 0 (Background), 1 (Abdominal Wall), 2 (Liver), 3 (GI Tract),")
-    print(f"           4 (Fat), 5 (Grasper/L-hook), 8 (Gallbladder)")
-    print(f"  Excluded: Class 6 (Connective Tissue)")
-    print(f"  L-hook Electrocautery consolidated into Grasper (class 5)")
-    print(f"\n  mIoU: {metrics['mIoU']:.4f}")
-    print(f"  Dice: {metrics['Dice']:.4f}")
-    print(f"  AP: {metrics['AP']:.4f}")
-    print(f"  AP50: {metrics['AP50']:.4f}")
-    print(f"  AP75: {metrics['AP75']:.4f}")
+    print("=" * 60)
+    print(f"{'Class ID':<15} | {'IoU':<10} | {'Dice':<10}")
+    print("-" * 60)
+    class_names = {
+        1: "Abdominal Wall",
+        2: "Liver",
+        3: "GI Tract",
+        4: "Fat",
+        5: "Grasper/L-hook",
+        8: "Gallbladder"
+    }
+    for c in classes_to_eval:
+        class_name = class_names.get(c, f"Class {c}")
+        print(f"{class_name:<15} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
+    print("-" * 60)
+    print(f"{'OVERALL':<15} | {mIoU:.4f}     | {mDice:.4f}")
+    print(f"{'mAP':<15} | {AP_total:.4f}")
+    print("=" * 60)
+    print(f"Note: Background (0) and Connective Tissue (6) excluded from evaluation")
+    print(f"      L-hook Electrocautery (7) consolidated into Grasper (5)")
+    print()
     
-    return metrics
+    return {
+        "mIoU": mIoU,
+        "Dice": mDice,
+        "AP": AP_total,
+        "AP50": AP_50,
+        "AP75": AP_75,
+        "per_class_iou": final_per_class_iou,
+        "per_class_dice": final_per_class_dice
+    }
 
 
 if __name__ == "__main__":
