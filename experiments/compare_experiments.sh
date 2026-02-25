@@ -61,8 +61,8 @@ fi
 clip_count=0
 processed_count=0
 
-# Find all clip folders (one level deep in dataset folder)
-for clip_folder in ${VISUALIZATIONS_ROOT}/*/*; do
+# Find all clip folders (three levels deep: procedure/video/clip)
+for clip_folder in ${VISUALIZATIONS_ROOT}/*/*/*; do
     if [ ! -d "${clip_folder}" ]; then
         continue
     fi
