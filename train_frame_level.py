@@ -190,7 +190,8 @@ def train(args):
             "  - endofm, endovit, sam2unet"
         )
 
-    if args.checkpoint:
+    # SAM2UNet handles checkpoint loading internally, skip for that model
+    if args.checkpoint and args.model != 'sam2unet':
         load_checkpoint(model, args.checkpoint)
 
     model.to(device)
