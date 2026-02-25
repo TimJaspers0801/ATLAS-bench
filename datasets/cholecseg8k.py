@@ -23,15 +23,15 @@ CHOLECSEG8K_CLASS_NAMES = [
 ]
 
 CHOLECSEG8K_MAPPING = {
-    0: 0,
-    1: 1,
-    2: 2,
-    3: 3,
-    4: 4,
-    5: 5,
-    6: 6,
-    7: 7,
-    8: 8
+    0: 0,  # Background
+    1: 1,  # Abdominal Wall
+    2: 2,  # Liver
+    3: 3,  # Gastrointestinal Tract
+    4: 4,  # Fat
+    5: 5,  # Grasper
+    6: 6,  # Connective Tissue (excluded from evaluation)
+    7: 5,  # L-hook Electrocautery -> Grasper (consolidated surgical tools)
+    8: 8   # Gallbladder
 }
 
 
