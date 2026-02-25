@@ -426,6 +426,50 @@ def atlas_vitb_dinov3(
     return model
 
 
+def atlas_vitb_dinov1(
+    num_classes: int = 19,
+    num_q: int = 100,
+    num_procedures: int = 0,
+    num_proc_q: int = 1,
+    temporal_num_tokens: int = 4,
+    temporal_contrastive_dim: int = 256,
+    temporal_query_learning_enabled: bool = True,
+):
+    """
+    Create ATLAS model with DINOv1 ViT-B backbone.
+    
+    Args:
+        num_classes: Number of segmentation classes
+        num_q: Number of segmentation query tokens
+        num_procedures: Number of surgical procedures (0 to disable)
+        num_proc_q: Number of procedure query tokens (ignored if num_procedures <= 0)
+        temporal_num_tokens: Number of temporal tokens (0 to disable temporal modeling)
+        temporal_contrastive_dim: Dimension for temporal contrastive learning
+        temporal_query_learning_enabled: Whether to propagate query embeddings across frames
+    """
+    from models.eomt.vit import ViT
+    
+    encoder = ViT(
+        img_size=(224, 224),
+        backbone_name="vit_base_patch16_224_dino",
+    )
+    
+    model = Atlas(
+        encoder=encoder,
+        num_classes=num_classes,
+        num_q=num_q,
+        num_blocks=4,
+        masked_attn_enabled=True,
+        num_procedures=num_procedures,
+        num_proc_q=num_proc_q,
+        temporal_num_tokens=temporal_num_tokens,
+        temporal_contrastive_dim=temporal_contrastive_dim,
+        temporal_query_learning_enabled=temporal_query_learning_enabled,
+    )
+    
+    return model
+
+
 def atlas_vits_dinov3(
     num_classes: int = 19,
     num_q: int = 100,
@@ -468,6 +512,50 @@ def atlas_vits_dinov3(
     )
     
     return model
+
+def atlas_vitb_dinov2(
+    num_classes: int = 19,
+    num_q: int = 100,
+    num_procedures: int = 0,
+    num_proc_q: int = 1,
+    temporal_num_tokens: int = 4,
+    temporal_contrastive_dim: int = 256,
+    temporal_query_learning_enabled: bool = True,
+):
+    """
+    Create ATLAS model with DINOv2 ViT-B backbone.
+    
+    Args:
+        num_classes: Number of segmentation classes
+        num_q: Number of segmentation query tokens
+        num_procedures: Number of surgical procedures (0 to disable)
+        num_proc_q: Number of procedure query tokens (ignored if num_procedures <= 0)
+        temporal_num_tokens: Number of temporal tokens (0 to disable temporal modeling)
+        temporal_contrastive_dim: Dimension for temporal contrastive learning
+        temporal_query_learning_enabled: Whether to propagate query embeddings across frames
+    """
+    from models.eomt.vit import ViT
+    
+    encoder = ViT(
+        img_size=(336, 336),
+        backbone_name="vit_base_patch14_dinov2.lvd142m",
+    )
+    
+    model = Atlas(
+        encoder=encoder,
+        num_classes=num_classes,
+        num_q=num_q,
+        num_blocks=4,
+        masked_attn_enabled=True,
+        num_procedures=num_procedures,
+        num_proc_q=num_proc_q,
+        temporal_num_tokens=temporal_num_tokens,
+        temporal_contrastive_dim=temporal_contrastive_dim,
+        temporal_query_learning_enabled=temporal_query_learning_enabled,
+    )
+    
+    return model
+
 
 # create atlas odel with only tracking (no procedure queries, no temporal queries)
 def atlas_vitl_dinov3_tracking(

@@ -98,6 +98,14 @@ IMAGE_SIZE_MAP = {
 
 def get_image_size(model_name: str) -> int:
     """Infer image size from model name."""
+    # Special case: ATLAS DINOv1 models use 224x224
+    if "atlas" in model_name and "dinov1" in model_name:
+        return 224
+    
+    # Special case: ATLAS DINOv2 models use 336x336
+    if "atlas" in model_name and "dinov2" in model_name:
+        return 336
+    
     # Special case: eomt_dinov2 models use 518x518
     if "eomt" in model_name and "dinov2" in model_name:
         return 518
@@ -203,7 +211,7 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
 
 def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
     """Load ATLAS model with temporal capabilities."""
-    from models.atlas.atlas import atlas_vitl_dinov3, atlas_vitb_dinov3, atlas_vits_dinov3, atlas_vitl_dinov3_tracking
+    from models.atlas.atlas import atlas_vitl_dinov3, atlas_vitb_dinov3, atlas_vits_dinov3, atlas_vitl_dinov3_tracking, atlas_vitb_dinov2, atlas_vitb_dinov1
     
     # Map model names to loader functions
     atlas_loaders = {
@@ -211,6 +219,8 @@ def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: 
         "atlas_vitl_dinov3_tracking": atlas_vitl_dinov3_tracking,
         "atlas_vitb_dinov3": atlas_vitb_dinov3,
         "atlas_vits_dinov3": atlas_vits_dinov3,
+        "atlas_vitb_dinov2": atlas_vitb_dinov2,
+        "atlas_vitb_dinov1": atlas_vitb_dinov1,
     }
     
     if model_name not in atlas_loaders:

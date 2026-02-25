@@ -78,7 +78,9 @@ MODELS=(
     # "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0|32"
     # "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|32"
     # "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|32"
-    "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|32"
+    # "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|32"
+    "atlas_vitb_dinov2|best_model.pth|atlas_vitb_dinov2_surgenet_336_seed0|0|32"
+    "atlas_vitb_dinov1|best_model.pth|atlas_vitb_dinov1_surgenet_224_seed0|0|32"
 
     # # EOMT SurgeNet models
     # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
