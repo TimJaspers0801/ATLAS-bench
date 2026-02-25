@@ -125,7 +125,14 @@ class ViT(nn.Module):
         return backbone
 
     def _get_intermediate_layers_hf(self, x, n, return_class_token=True, **kwargs):
-        out = self.backbone(pixel_values=x, output_hidden_states=True)
+        # Try to call the backbone with the correct parameter name
+        # HF models might use 'pixel_values' or models might use 'x'
+        try:
+            out = self.backbone(pixel_values=x, output_hidden_states=True)
+        except TypeError:
+            # If pixel_values doesn't work, try 'x'
+            out = self.backbone(x, output_hidden_states=True)
+        
         hidden = out.hidden_states
         idxs = list(n)
         picks = []
@@ -150,13 +157,16 @@ class ViTBackbone(nn.Module):
         # Get the backbone (either from ViT wrapper or directly)
         if hasattr(vit_model, 'backbone'):
             self.backbone = vit_model.backbone
-            # Check if ViT wrapper has custom get_intermediate_layers (for HF models)
-            if hasattr(vit_model, '_get_intermediate_layers_hf'):
-                # Bind the HF wrapper to this instance
+            # Check if the backbone itself is a HuggingFace model
+            # (has embeddings and layer attributes)
+            is_backbone_hf = hasattr(self.backbone, 'embeddings') and hasattr(self.backbone, 'layer')
+            
+            if is_backbone_hf and hasattr(vit_model, '_get_intermediate_layers_hf'):
+                # Use HF wrapper only if backbone is actually HF
                 self.get_intermediate_layers_fn = lambda x, n: vit_model._get_intermediate_layers_hf(x, n, return_class_token=False)
                 self.is_hf_model = True
             elif hasattr(vit_model, '_get_intermediate_layers_timm'):
-                # Bind the timm wrapper to this instance
+                # Use timm wrapper if available
                 self.get_intermediate_layers_fn = lambda x, n: vit_model._get_intermediate_layers_timm(x, n, return_prefix_tokens=False)
                 self.is_hf_model = False
             else:
