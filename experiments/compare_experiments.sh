@@ -1,8 +1,10 @@
 #!/bin/bash
-#SBATCH --nodes=1
-#SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
-#SBATCH --time=2:00:00
+#SBATCH --nodes=1                               # Specify the amount of nodes
+#SBATCH --ntasks=1                              # Specify the number of tasks
+#SBATCH --cpus-per-task=8                       # Specify the number of CPUs/task
+#SBATCH --gpus=1                                # Specify the number of GPUs
+#SBATCH --partition=gpu_h100                    # Specify the node partition
+#SBATCH --time=2:00:00                          # Specify the maximum time the job can run
 
 # ===========================
 # Compare experiment predictions
