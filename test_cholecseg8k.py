@@ -640,12 +640,15 @@ def main(args):
         persistent_workers=True,
     )
     
-    # Load model (trained for 30 ATLAS classes)
+    # Load model with ATLAS's original 30 classes (checkpoint was trained on ATLAS)
+    # Class mapping to CholecSeg8K's 9 classes happens during inference
     print(f"\nLoading model: {args.model}")
+    print(f"Model classes: {args.num_classes} (ATLAS)")
+    print(f"Target classes: {args.num_cholecseg8k_classes} (CholecSeg8K)")
     model = load_model(
         args.model,
         args.checkpoint,
-        args.num_classes,  # Use ATLAS's 30 classes
+        args.num_classes,  # ATLAS model was trained with 30 classes
         device
     )
     
@@ -887,7 +890,7 @@ if __name__ == "__main__":
         "--num_classes",
         type=int,
         default=30,
-        help="Number of classes in ATLAS model (30)"
+        help="Number of classes in ATLAS model output (30 for ATLAS-trained models)"
     )
     parser.add_argument(
         "--num_cholecseg8k_classes",

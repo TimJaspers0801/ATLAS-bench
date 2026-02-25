@@ -36,7 +36,8 @@ cd ${PROJECT_ROOT} || exit 1
 # ===========================
 
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/datasets/cholecseg8k.zip
-NUM_CLASSES=9
+NUM_ATLAS_CLASSES=30  # Model was trained with 30 ATLAS classes
+NUM_CHOLECSEG8K_CLASSES=9  # Target dataset has 9 classes
 NUM_WORKERS=16
 BATCH_SIZE=32
 
@@ -166,7 +167,8 @@ for model_config in "${MODELS[@]}"; do
             --model ${MODEL_NAME} \
             ${CHECKPOINT_ARG} \
             --data_path /data/cholecseg8k.zip \
-            --num_classes ${NUM_CLASSES} \
+            --num_classes ${NUM_ATLAS_CLASSES} \
+            --num_cholecseg8k_classes ${NUM_CHOLECSEG8K_CLASSES} \
             --batch_size ${BATCH_SIZE} \
             --num_workers ${NUM_WORKERS} \
             --seed ${SEED} \
