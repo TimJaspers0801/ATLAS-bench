@@ -3,7 +3,7 @@ Test script for benchmarking ATLAS-trained models on the CholecSeg8K dataset.
 
 This script evaluates ATLAS models on CholecSeg8K by:
 1. Combining all three splits (train/val/test) as one unified test set
-2. Mapping ATLAS's 30 output classes to CholecSeg8K's 9 classes
+2. Mapping ATLAS's 30 output classes to CholecSeg8K's 13 classes
 3. Computing metrics on the mapped output
 
 Supports:
@@ -31,7 +31,7 @@ from collections import defaultdict
 import cv2
 
 from torch.utils.data import DataLoader, ConcatDataset
-from datasets.cholecseg8k import CholecSeg8kDataset
+from datasets.cholecseg8k import CholecSeg8kDataset, CHOLECSEG8K_CLASS_NAMES
 import torchvision.transforms.v2 as T
 import torch.nn.functional as F
 
@@ -50,10 +50,10 @@ import numpy as np
 
 
 # ===========================
-# Class Mapping: ATLAS 30 classes -> CholecSeg8K 9 classes
+# Class Mapping: ATLAS 30 classes -> CholecSeg8K 13 classes
 # ===========================
-# This mapping defines how ATLAS's 30 output classes are mapped to CholecSeg8K's 9 classes.
-# EVALUATION FOCUS: Only 7 classes are evaluated (excluding Connective Tissue class 6)
+# This mapping defines how ATLAS's 30 output classes are mapped to CholecSeg8K's 13 classes.
+# EVALUATION FOCUS: All foreground classes (1-12) are evaluated (background excluded)
 #
 # ATLAS classes (30):
 #   0: Background
@@ -75,41 +75,48 @@ import numpy as np
 #   16: Spleen
 #   17-29: Other (reproductive/urinary structures - not relevant for cholecystectomy)
 #
-# CholecSeg8K classes (9):
+# CholecSeg8K classes (13):
 #   0: Black Background
 #   1: Abdominal Wall
 #   2: Liver
 #   3: Gastrointestinal Tract
 #   4: Fat
-#   5: Grasper (now includes L-hook Electrocautery)
-#   6: Connective Tissue (EXCLUDED FROM EVALUATION)
-#   7: L-hook Electrocautery -> mapped to class 5 (Grasper)
-#   8: Gallbladder
+#   5: Grasper
+#   6: Connective Tissue
+#   7: Blood
+#   8: Cystic Duct
+#   9: L-hook Electrocautery
+#   10: Gallbladder
+#   11: Hepatic Vein
+#   12: Liver Ligament
 #
 # Mapping Strategy:
 #   - Background structures -> 0 (Background)
-#   - Tools (ATLAS 1) -> 5 (Grasper) - surgical tools
-#   - Vessels, Ducts, Nerves, Ligaments -> 0 (Background) - excluded from evaluation
+#   - Tools (ATLAS 1) -> 5 (Grasper)
+#   - Vein -> 11 (Hepatic Vein)
+#   - Artery -> 7 (Blood)
+#   - Nerve -> 6 (Connective Tissue)
+#   - Bile/lymph Duct -> 8 (Cystic Duct)
+#   - Hepatic ligament/Cystic plate -> 12 (Liver Ligament)
 #   - GI tract structures -> 3 (Gastrointestinal Tract)
-#   - Body structures -> appropriate direct mapping
 #   - Non-cholecystectomy organs -> 0 (Background)
 
 ATLAS_TO_CHOLECSEG8K_MAPPING = {
     0:  0,   # Background -> Background
     1:  5,   # Tools/camera -> Grasper (surgical tools)
-    2:  0,   # Vein -> Background (excluded - was Connective Tissue)
-    3:  0,   # Artery -> Background (excluded - was Connective Tissue)
-    4:  0,   # Nerve -> Background (excluded - was Connective Tissue)
+    2:  11,  # Vein -> Hepatic Vein
+    3:  7,   # Artery -> Blood
+    4:  6,   # Nerve -> Connective Tissue
     5:  3,   # Small intestine -> Gastrointestinal Tract
     6:  3,   # Colon/rectum -> Gastrointestinal Tract
     7:  1,   # Abdominal wall -> Abdominal Wall (direct mapping)
     8:  0,   # Diaphragm -> Background (not relevant for cholecystectomy)
     9:  4,   # Fat -> Fat (direct mapping)
     10: 2,   # Liver -> Liver (direct mapping)
-    11: 0,   # Bile/lymph Duct -> Background (excluded - was Connective Tissue)
-    12: 8,   # Gallbladder -> Gallbladder (direct mapping - primary organ)
-    13: 0,   # Hepatic ligament -> Background (excluded - was Connective Tissue)
-    14: 0,   # Cystic plate -> Background (excluded - was Connective Tissue)
+    11: 8,   # Bile/lymph Duct -> Cystic Duct
+    12: 10,  # Gallbladder -> Gallbladder (direct mapping - primary organ)
+    13: 12,  # Hepatic ligament -> Liver Ligament
+    14: 12,  # Cystic plate -> Liver Ligament
     15: 3,   # Stomach -> Gastrointestinal Tract
     16: 0,   # Spleen -> Background (not directly involved in cholecystectomy)
     17: 0,   # Uterus -> Background (not relevant for cholecystectomy)
@@ -128,42 +135,19 @@ ATLAS_TO_CHOLECSEG8K_MAPPING = {
 }
 
 CLASS_MAPPING_EXPLANATION = """
-ATLAS 30 Classes -> CholecSeg8K Classes Mapping for Evaluation
-=========================================================
+ATLAS 30 Classes -> CholecSeg8K Classes Mapping
+===============================================
 
-EVALUATION CLASSES (7 classes only):
-
-  ✓ Class 0 (Background) - Direct mapping from ATLAS
-  ✓ Class 1 (Abdominal Wall) - Direct mapping from ATLAS class 7
-  ✓ Class 2 (Liver) - Direct mapping from ATLAS class 10
-  ✓ Class 3 (Gastrointestinal Tract) - Unified from ATLAS classes 5,6,15 (intestine/colon/stomach)
-  ✓ Class 4 (Fat) - Direct mapping from ATLAS class 9
-  ✓ Class 5 (Grasper/L-hook) - ATLAS class 1 (Tools) + CholecSeg8K class 7 (L-hook)
-    Both surgical tools consolidated into single class
-  ✓ Class 8 (Gallbladder) - Direct mapping from ATLAS class 12
-
-EXCLUDED FROM EVALUATION:
-
-  ✗ Class 6 (Connective Tissue) - This class is NOT evaluated
-    ATLAS structures like vessels (2,3), nerves (4), ducts (11), ligaments (13,14)
-    are mapped to Background (0) instead of being grouped into Connective Tissue
-    
-RATIONALE FOR EXCLUSIONS:
-
-  - Connective Tissue (class 6): Fine anatomical structures without clear clinical relevance
-    in cholecystectomy segmentation; focus is on surgical anatomy and tools
-  - L-hook Electrocautery remapping: Consolidated with Grasper (class 5) as both are
-    surgical tools used during the procedure
-  - Non-cholecystectomy organs: Structures like spleen, diaphragm, reproductive organs
-    are mapped to background as they're not relevant to cholecystectomy
-
-MAPPING SUMMARY FOR EVALUATION:
-  - Evaluated classes: 0, 1, 2, 3, 4, 5, 8 (7 classes total)
-  - Excluded classes: 6
-  - Unmapped: Class 7 (L-hook) in CholecSeg8K is remapped to class 5 (Grasper)
-
-Note: This focused mapping and evaluation ensures fair assessment of ATLAS models
-on CholecSeg8K while concentrating on clinically relevant anatomical structures.
+Key Mappings:
+  - Tools/camera -> Grasper (class 5)
+  - Vein -> Hepatic Vein (class 11)
+  - Artery -> Blood (class 7)
+  - Nerve -> Connective Tissue (class 6)
+  - Bile/lymph Duct -> Cystic Duct (class 8)
+  - Hepatic ligament/Cystic plate -> Liver Ligament (class 12)
+  - Gallbladder -> Gallbladder (class 10)
+  - GI tract structures -> Gastrointestinal Tract (class 3)
+  - Non-cholecystectomy organs -> Background (class 0)
 """
 
 print(CLASS_MAPPING_EXPLANATION)
@@ -237,7 +221,7 @@ def get_image_size(model_name: str) -> int:
 
 def map_atlas_to_cholecseg8k(pred_mask):
     """
-    Map ATLAS predictions (30 classes) to CholecSeg8K classes (9 classes).
+    Map ATLAS predictions (30 classes) to CholecSeg8K classes (13 classes).
     
     Args:
         pred_mask: Tensor of shape (B, H, W) or (H, W) with class indices
@@ -567,6 +551,26 @@ def save_random_visualizations(
                 sample_count += 1
 
 
+def print_class_occurrences(dataloader, num_classes, class_names):
+    """Print per-class pixel occurrences across the dataset."""
+    counts = np.zeros(num_classes, dtype=np.int64)
+
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="Counting class occurrences"):
+            masks = batch["mask"]
+            if masks.ndim > 3:
+                masks = masks.squeeze(1)
+            flat = masks.view(-1).to(torch.int64)
+            counts += torch.bincount(flat, minlength=num_classes).cpu().numpy()
+
+    print("\nClass occurrences (pixel counts):")
+    print("=" * 60)
+    for class_id in range(num_classes):
+        name = class_names[class_id] if class_id < len(class_names) else f"Class {class_id}"
+        print(f"{class_id:>2} | {name:<22} | {counts[class_id]}")
+    print("=" * 60)
+
+
 def main(args):
     # Set random seeds
     random.seed(args.seed)
@@ -636,9 +640,12 @@ def main(args):
         pin_memory=True,
         persistent_workers=True,
     )
+
+    # Print class occurrences before evaluation
+    print_class_occurrences(test_loader, args.num_cholecseg8k_classes, CHOLECSEG8K_CLASS_NAMES)
     
     # Load model with ATLAS's original 30 classes (checkpoint was trained on ATLAS)
-    # Class mapping to CholecSeg8K's 9 classes happens during inference
+    # Class mapping to CholecSeg8K's 13 classes happens during inference
     print(f"\nLoading model: {args.model}")
     print(f"Model classes: {args.num_classes} (ATLAS)")
     print(f"Target classes: {args.num_cholecseg8k_classes} (CholecSeg8K)")
@@ -667,11 +674,9 @@ def main(args):
     
     # Evaluate with class mapping
     print(f"\nEvaluating on CholecSeg8K (all splits combined, {len(combined_dataset)} frames)...")
-    print(f"Class mapping pipeline:")
-    print(f"  1. ATLAS 30 classes → CholecSeg8K 9 classes")
-    print(f"  2. L-hook Electrocautery (GT class 7) → Grasper (class 5)")
-    print(f"  3. Exclude Connective Tissue (class 6) from evaluation")
-    print(f"  4. Evaluate on 7 classes: 0, 1, 2, 3, 4, 5, 8")
+    print("Class mapping pipeline:")
+    print("  1. ATLAS 30 classes → CholecSeg8K 13 classes")
+    print("  2. Evaluate on classes 1-6, 8-11 (background, blood, liver ligament excluded)")
 
     # Custom evaluation with class mapping
     metrics = evaluate_model_with_mapping(
@@ -679,7 +684,7 @@ def main(args):
         test_loader,
         device,
         args.num_classes,  # ATLAS has 30 classes
-        args.num_cholecseg8k_classes,  # CholecSeg8K has 9 classes
+        args.num_cholecseg8k_classes,  # CholecSeg8K has 13 classes
         is_atlas=args.model.startswith("atlas"),
     )
 
@@ -713,9 +718,9 @@ def main(args):
             "checkpoint": args.checkpoint,
             "dataset": "CholecSeg8K (combined train/val/test splits)",
             "num_frames": len(combined_dataset),
-            "class_mapping": "ATLAS 30 classes -> CholecSeg8K 9 classes (with L-hook -> Grasper consolidation)",
-            "evaluation_classes": "0 (Background), 1 (Abdominal Wall), 2 (Liver), 3 (GI Tract), 4 (Fat), 5 (Grasper+L-hook), 8 (Gallbladder)",
-            "excluded_classes": "6 (Connective Tissue)",
+            "class_mapping": "ATLAS 30 classes -> CholecSeg8K 13 classes",
+            "evaluation_classes": "1-6, 8-11 (foreground classes)",
+            "excluded_classes": "0 (Background), 7 (Blood), 12 (Liver Ligament)",
             "metrics": {
                 "mIoU": float(metrics["mIoU"]),
                 "Dice": float(metrics["Dice"]),
@@ -735,29 +740,17 @@ def main(args):
 
 def apply_evaluation_mapping(pred_masks, gt_masks):
     """
-    Apply evaluation-specific remapping:
-    1. Map and consolidate L-hook Electrocautery (GT class 7) to Grasper (class 5)
-    2. Exclude Connective Tissue (class 6) by remapping to background (0)
+    Apply evaluation-specific remapping.
+
+    Currently, this is a no-op and simply returns the inputs unchanged.
     """
-    gt_masks = gt_masks.clone()
-    pred_masks = pred_masks.clone()
-    
-    # Map CholecSeg8K L-hook (7) to Grasper (5) in ground truth
-    gt_masks[gt_masks == 7] = 5
-    
-    # Remap any class 6 (Connective Tissue) in predictions to background
-    pred_masks[pred_masks == 6] = 0
-    
-    # Remap any class 6 in ground truth to background as well
-    gt_masks[gt_masks == 6] = 0
-    
     return pred_masks, gt_masks
 
 
 def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, num_cholecseg8k_classes, is_atlas=False):
     """
     Evaluate model with class mapping from ATLAS to CholecSeg8K.
-    Excludes Connective Tissue class (6) from evaluation.
+    Evaluates foreground classes (1-6, 8-11) and excludes background (0), blood (7), and liver ligament (12).
     """
     from evaluation.metrics import compute_class_metrics, SegmentationAPEvaluator
     
@@ -852,18 +845,18 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
                 
                 preds = torch.argmax(probs, dim=1, keepdim=True)
             
-            # Apply class mapping to predictions (ATLAS 30 -> CholecSeg8K 9)
+            # Apply class mapping to predictions (ATLAS 30 -> CholecSeg8K 13)
             # Squeeze preds to (B, H, W) for mapping
             preds_2d = preds.squeeze(1)
             preds_mapped = map_atlas_to_cholecseg8k(preds_2d)
             gt_masks_mapped = map_atlas_to_cholecseg8k(gt_masks)
             
-            # Apply evaluation-specific remapping (consolidate L-hook, exclude Connective Tissue)
+            # Apply evaluation-specific remapping (currently no-op)
             preds_mapped, gt_masks_mapped = apply_evaluation_mapping(preds_mapped, gt_masks_mapped)
             
             # Compute metrics for each image in batch
-            # Classes to evaluate: 0-8 except 6 (Connective Tissue), but we skip background 0
-            classes_to_eval = [1, 2, 3, 4, 5, 8]  # Skip 0 (background), 6 (excluded), 7 (remapped to 5)
+            # Evaluate foreground classes (exclude background 0, blood 7, liver ligament 12)
+            classes_to_eval = [c for c in range(1, num_cholecseg8k_classes) if c not in [7, 12]]
             
             for i in range(len(images)):
                 # --- AP Handling ---
@@ -948,14 +941,7 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
     print("=" * 60)
     print(f"{'Class ID':<15} | {'IoU':<10} | {'Dice':<10}")
     print("-" * 60)
-    class_names = {
-        1: "Abdominal Wall",
-        2: "Liver",
-        3: "GI Tract",
-        4: "Fat",
-        5: "Grasper/L-hook",
-        8: "Gallbladder"
-    }
+    class_names = {i: CHOLECSEG8K_CLASS_NAMES[i] for i in classes_to_eval}
     for c in classes_to_eval:
         class_name = class_names.get(c, f"Class {c}")
         print(f"{class_name:<15} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
@@ -963,8 +949,7 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
     print(f"{'OVERALL':<15} | {mIoU:.4f}     | {mDice:.4f}")
     print(f"{'mAP':<15} | {AP_total:.4f}")
     print("=" * 60)
-    print(f"Note: Background (0) and Connective Tissue (6) excluded from evaluation")
-    print(f"      L-hook Electrocautery (7) consolidated into Grasper (5)")
+    print("Note: Background (0), Blood (7), and Liver Ligament (12) excluded from evaluation")
     print()
     
     return {
@@ -1008,8 +993,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num_cholecseg8k_classes",
         type=int,
-        default=9,
-        help="Number of CholecSeg8K classes (9)"
+        default=13,
+        help="Number of CholecSeg8K classes (13)"
     )
     parser.add_argument(
         "--batch_size",

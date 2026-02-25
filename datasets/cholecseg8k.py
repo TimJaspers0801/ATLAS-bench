@@ -18,20 +18,28 @@ CHOLECSEG8K_CLASS_NAMES = [
     'Fat',
     'Grasper',
     'Connective Tissue',
+    'Blood',
+    'Cystic Duct',
     'L-hook Electrocautery',
-    'Gallbladder'
+    'Gallbladder',
+    'Hepatic Vein',
+    'Liver Ligament',
 ]
 
 CHOLECSEG8K_MAPPING = {
-    0: 0,  # Background
-    1: 1,  # Abdominal Wall
-    2: 2,  # Liver
-    3: 3,  # Gastrointestinal Tract
-    4: 4,  # Fat
-    5: 5,  # Grasper
-    6: 6,  # Connective Tissue (excluded from evaluation)
-    7: 5,  # L-hook Electrocautery -> Grasper (consolidated surgical tools)
-    8: 8   # Gallbladder
+    0: 0,   # Black Background
+    1: 1,   # Abdominal Wall
+    2: 2,   # Liver
+    3: 3,   # Gastrointestinal Tract
+    4: 4,   # Fat
+    5: 5,   # Grasper
+    6: 6,   # Connective Tissue
+    7: 7,   # Blood
+    8: 8,   # Cystic Duct
+    9: 9,   # L-hook Electrocautery
+    10: 10, # Gallbladder
+    11: 11, # Hepatic Vein
+    12: 12, # Liver Ligament
 }
 
 

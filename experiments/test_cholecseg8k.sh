@@ -37,7 +37,7 @@ cd ${PROJECT_ROOT} || exit 1
 
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/datasets/cholecseg8k.zip
 NUM_ATLAS_CLASSES=30  # Model was trained with 30 ATLAS classes
-NUM_CHOLECSEG8K_CLASSES=9  # Target dataset has 9 classes
+NUM_CHOLECSEG8K_CLASSES=13  # Target dataset has 13 classes
 NUM_WORKERS=16
 BATCH_SIZE=32
 
