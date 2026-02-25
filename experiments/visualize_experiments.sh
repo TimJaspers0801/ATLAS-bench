@@ -34,7 +34,7 @@ cd ${PROJECT_ROOT} || exit 1
 # Dataset config
 # ===========================
 
-DATASET=cholecseg8k  # atlas | cholecseg8k
+DATASET=atlas  # atlas | cholecseg8k
 NUM_CLIPS=10
 CLIP_FPS=15
 SAVE_FPS=1
@@ -57,9 +57,27 @@ fi
 
 # Format: "model_name|checkpoint_pattern|experiment_pattern|seed"
 MODELS=(
-    "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0"
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0"
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0"
+    # "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0"
+    # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0"
+    # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0"
+    # SAM2-UNet 
+    "sam2unet|best_model.pth|sam2unet_atlas|0"
+    # SAM3-UNet 
+    "sam3unet|best_model.pth|sam3unet_atlas|0"
+    #Altas
+    "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0"
+    "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0"
+    "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0"
+    # SurgeNet Baselines
+    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0"
+    "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0"
+    "surgenet-caformer-s18|best_model.pth|caformer_atlas|0"
+       
+    # Other models 
+    "endofm|best_model.pth|endofm_atlas|0"
+    "endovit|best_model.pth|endovit_atlas|0"
+    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0"
+
 )
 
 # ===========================
