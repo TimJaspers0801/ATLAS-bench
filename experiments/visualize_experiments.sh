@@ -47,7 +47,7 @@ if [ "${DATASET}" = "atlas" ]; then
     DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
     NUM_CLASSES=30
 else
-    DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/cholecseg8k/cholecseg8k.zip
+    DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/datasets/cholecseg8k.zip
     NUM_CLASSES=30
 fi
 
