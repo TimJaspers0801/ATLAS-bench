@@ -35,7 +35,7 @@ cd ${PROJECT_ROOT} || exit 1
 # Dataset config
 # ===========================
 
-DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/cholecseg8k.zip
+DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/datasets/cholecseg8k.zip
 NUM_CLASSES=9
 NUM_WORKERS=16
 BATCH_SIZE=32
