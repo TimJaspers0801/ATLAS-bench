@@ -2,7 +2,67 @@ import torch
 from collections import defaultdict
 from tqdm import tqdm
 import numpy as np
+from typing import List, Optional
 from .metrics import compute_class_metrics, SegmentationAPEvaluator
+
+
+def compute_mVC_for_clip(
+    preds_list: List[np.ndarray],
+    gts_list: List[np.ndarray],
+    n: int,
+    background_label: int = 0,
+    skip_empty_windows: bool = True,
+) -> Optional[float]:
+    """
+    Compute VC_n for a single clip (sliding windows).
+    Returns clip-level VC_n (mean over windows) or None if the clip
+    had no valid windows (all windows had empty gt_common after excluding background).
+
+    Args:
+        preds_list: List of 2D integer label maps (H x W), in temporal order
+        gts_list: List of 2D integer label maps (H x W), in temporal order
+        n: Window size (number of consecutive frames)
+        background_label: Label value for background class
+        skip_empty_windows: If True, skip windows with no valid gt pixels
+
+    Returns:
+        Temporal consistency (VC) metric for the clip or None if no valid windows
+    """
+    C = len(preds_list)
+    if C < n:
+        return None
+
+    window_vcs = []
+    total_windows = C - n + 1
+
+    for i in range(total_windows):
+        wp = np.stack(preds_list[i : i + n], axis=0)  # (n, H, W)
+        wg = np.stack(gts_list[i : i + n], axis=0)  # (n, H, W)
+
+        # Find pixels where GT is consistent across all frames in window
+        gt_equal = np.all(wg == wg[0:1], axis=0)  # (H, W)
+        gt_label_first = wg[0]  # (H, W)
+        gt_common_nonbg = gt_equal & (gt_label_first != background_label)
+        denom = int(gt_common_nonbg.sum())
+
+        if denom == 0:
+            if skip_empty_windows:
+                continue  # skip window as invalid
+            else:
+                window_vcs.append(0.0)
+                continue
+
+        # Find pixels where prediction is also consistent
+        pred_common = np.all(wp == wp[0:1], axis=0)  # (H, W)
+        num = int(np.logical_and(gt_common_nonbg, pred_common).sum())
+
+        ratio = float(num) / float(denom)
+        window_vcs.append(ratio)
+
+    if len(window_vcs) == 0:
+        return None
+
+    return float(np.mean(window_vcs))
 
 
 def evaluate_model(model, dataloader, device, num_classes):
@@ -22,6 +82,9 @@ def evaluate_model(model, dataloader, device, num_classes):
     # format: {class_id: [score_img1, score_img2, ...]}
     class_ious = defaultdict(list)
     class_dices = defaultdict(list)
+
+    # Track predictions and GTs per clip for temporal consistency metrics
+    clip_frames = defaultdict(lambda: {"preds": [], "gts": []})
 
     # We still keep the AP logic as it was
     clip_ap = {}
@@ -61,6 +124,10 @@ def evaluate_model(model, dataloader, device, num_classes):
 
                 pred_np = preds[i, 0].cpu().numpy()
                 gt_np = gt_masks[i].cpu().numpy().squeeze()
+                
+                # Store for temporal metrics
+                clip_frames[clip_id]["preds"].append(pred_np)
+                clip_frames[clip_id]["gts"].append(gt_np)
                 
                 gt_np_masked = gt_np
 
@@ -120,16 +187,42 @@ def evaluate_model(model, dataloader, device, num_classes):
     AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
     AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
 
+    # Compute temporal consistency (mVC) for different window sizes
+    window_sizes = [8, 12, 24]
+    mvc_metrics = {}
+    
+    for window_n in window_sizes:
+        clip_vcs = []
+        for clip_id, frames_data in clip_frames.items():
+            vc = compute_mVC_for_clip(
+                frames_data["preds"],
+                frames_data["gts"],
+                n=window_n,
+                background_label=0,
+                skip_empty_windows=True,
+            )
+            if vc is not None:
+                clip_vcs.append(vc)
+        
+        if clip_vcs:
+            mvc_metrics[f"mVC_{window_n}"] = np.mean(clip_vcs)
+        else:
+            mvc_metrics[f"mVC_{window_n}"] = 0.0
+
     # --- Print Detailed Report ---
-    print("\n" + "=" * 40)
+    print("\n" + "=" * 50)
     print(f"{'Class ID':<10} | {'IoU':<10} | {'Dice':<10}")
-    print("-" * 40)
+    print("-" * 50)
     for c in classes_to_eval:
         print(f"Class {c:<4} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
-    print("-" * 40)
+    print("-" * 50)
     print(f"{'OVERALL':<10} | {mIoU:.4f}     | {mDice:.4f}")
     print(f"{'mAP':<10} | {AP_total:.4f}")
-    print("=" * 40 + "\n")
+    print("-" * 50)
+    print("Temporal Consistency (mVC - Mean across clips):")
+    for window_n in window_sizes:
+        print(f"  mVC_{window_n:<2} | {mvc_metrics[f'mVC_{window_n}']:.4f}")
+    print("=" * 50 + "\n")
 
     return {
         "mIoU": mIoU,
@@ -138,7 +231,10 @@ def evaluate_model(model, dataloader, device, num_classes):
         "AP50": AP_50,
         "AP75": AP_75,
         "per_class_iou": final_per_class_iou,
-        "per_class_dice": final_per_class_dice
+        "per_class_dice": final_per_class_dice,
+        "mVC_8": mvc_metrics["mVC_8"],
+        "mVC_12": mvc_metrics["mVC_12"],
+        "mVC_24": mvc_metrics["mVC_24"],
     }
 
 
@@ -174,6 +270,9 @@ def evaluate_atlas_temporal(
     # Track metrics per class
     class_ious = defaultdict(list)
     class_dices = defaultdict(list)
+    
+    # Track predictions and GTs per clip for temporal consistency metrics
+    clip_frames = defaultdict(lambda: {"preds": [], "gts": []})
     
     # Track AP per clip
     clip_ap = {}
@@ -249,6 +348,10 @@ def evaluate_atlas_temporal(
                 pred_np = preds[b].cpu().numpy()
                 gt_np = gt_masks[b].cpu().numpy().squeeze()
                 
+                # Store for temporal metrics
+                clip_frames[clip_key]["preds"].append(pred_np)
+                clip_frames[clip_key]["gts"].append(gt_np)
+                
                 # --- Compute per-class metrics (IoU, Dice) ---
                 for c in classes_to_eval:
                     iou_c, dice_c = compute_class_metrics(
@@ -300,16 +403,42 @@ def evaluate_atlas_temporal(
     AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
     AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
     
+    # Compute temporal consistency (mVC) for different window sizes
+    window_sizes = [8, 12, 24]
+    mvc_metrics = {}
+    
+    for window_n in window_sizes:
+        clip_vcs = []
+        for clip_id, frames_data in clip_frames.items():
+            vc = compute_mVC_for_clip(
+                frames_data["preds"],
+                frames_data["gts"],
+                n=window_n,
+                background_label=0,
+                skip_empty_windows=True,
+            )
+            if vc is not None:
+                clip_vcs.append(vc)
+        
+        if clip_vcs:
+            mvc_metrics[f"mVC_{window_n}"] = np.mean(clip_vcs)
+        else:
+            mvc_metrics[f"mVC_{window_n}"] = 0.0
+    
     # Print detailed report
-    print("\n" + "=" * 40)
+    print("\n" + "=" * 50)
     print(f"{'Class ID':<10} | {'IoU':<10} | {'Dice':<10}")
-    print("-" * 40)
+    print("-" * 50)
     for c in classes_to_eval:
         print(f"Class {c:<4} | {final_per_class_iou[c]:.4f}     | {final_per_class_dice[c]:.4f}")
-    print("-" * 40)
+    print("-" * 50)
     print(f"{'OVERALL':<10} | {mIoU:.4f}     | {mDice:.4f}")
     print(f"{'mAP':<10} | {AP_total:.4f}")
-    print("=" * 40 + "\n")
+    print("-" * 50)
+    print("Temporal Consistency (mVC - Mean across clips):")
+    for window_n in window_sizes:
+        print(f"  mVC_{window_n:<2} | {mvc_metrics[f'mVC_{window_n}']:.4f}")
+    print("=" * 50 + "\n")
     
     return {
         "mIoU": mIoU,
@@ -318,5 +447,8 @@ def evaluate_atlas_temporal(
         "AP50": AP_50,
         "AP75": AP_75,
         "per_class_iou": final_per_class_iou,
-        "per_class_dice": final_per_class_dice
+        "per_class_dice": final_per_class_dice,
+        "mVC_8": mvc_metrics["mVC_8"],
+        "mVC_12": mvc_metrics["mVC_12"],
+        "mVC_24": mvc_metrics["mVC_24"],
     }
