@@ -8,7 +8,7 @@ from models.surgenet import pvtv2
 from models.surgenet import metaformer
 from models.decoders.vit import ViTSegmenter, ViT
 from models.GastroNet5M import vit_base_14
-from models.SAM2UNet import SAM2UNet
+from models.SAM2UNet.SAM2UNet import SAM2UNet
 
 
 # This code loads all DINO model weights (v1, v2, v3) using timm library. Some unexpected keys are ignored during loading, this is intended behaviour.
