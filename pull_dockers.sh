@@ -10,4 +10,4 @@
 export APPTAINER_TMPDIR=/gpfs/work5/0/tesr0602/Tim/temp/
 
 
-apptainer pull atlas.sif docker://tjmjaspers/atlas:v4
+apptainer pull atlasv2.sif docker://tjmjaspers/atlas:v4
