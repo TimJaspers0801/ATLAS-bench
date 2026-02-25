@@ -89,7 +89,7 @@ IMAGE_SIZE_MAP = {
     "256": 256,
     "336": 336,
     "518": 518,
-    "dinov2": 224,
+    "dinov2": 518,
     "dinov3": 256,
     "gastronet": 336,
     'eomt': 256,
