@@ -47,22 +47,14 @@ class CholecSeg8kDataset(Dataset):
     """
     Zip-based CholecSeg8k dataset with train/val/test split.
     
-    Dataset structure in zip:
-    - cholecseg8k/
-      - Train/
-        - frames/
-        - masks/
-      - Validation/
-        - frames/
-        - masks/
-      - Test/
-        - frames/
-        - masks/
+        Dataset structure in zip (original):
+        - cholecseg8k/
+            - video{nb}/
+                - video{nb}_{clip_nb}/
+                    - frame_{framenum}_endo.png
+                    - frame_{framenum}_endo_mask.png
     
-    Frame format: video{XX}_{clips_nb}_frame_{framenum}_endo.png
-    Masks: machine_masks (corresponding .png files)
-    
-    All frames are treated as part of a single "clip" for compatibility with AtlasDataset interface.
+        Frames and masks live in the same clip folder and are paired by filename.
     """
 
     def __init__(
@@ -104,14 +96,6 @@ class CholecSeg8kDataset(Dataset):
             self.norm_mean = None
             self.norm_std = None
 
-        # Map lowercase split names to actual folder names in zip
-        split_folder_map = {
-            "train": "Train",
-            "val": "Validation",
-            "test": "Test"
-        }
-        self.split_folder = split_folder_map[split]
-
         # CholecSeg8k normalization stats
         # These are reasonable defaults; can be updated based on actual statistics
         self.mean = [0.485, 0.456, 0.406]
@@ -137,39 +121,34 @@ class CholecSeg8kDataset(Dataset):
         with zipfile.ZipFile(self.zip_path, "r") as zf:
             all_files = [p.lstrip("./") for p in zf.namelist() if not p.endswith("/")]
 
-        frames_dir = f"cholecseg8k/{self.split_folder}/frames/"
-        masks_dir = f"cholecseg8k/{self.split_folder}/masks/"
-
         all_files_set = set(all_files)
 
         # Collect frame files and organize by video/clip
         for file in all_files:
-            if not file.startswith(frames_dir) or not file.lower().endswith('.png'):
+            if not file.lower().endswith("_endo.png"):
                 continue
 
-            filename = file[len(frames_dir):]
-            
-            # Parse filename: video{XX}_{clips_nb}_frame_{framenum}_endo.png
-            # Example: video01_1_frame_000000_endo.png
-            try:
-                parts = filename.replace('_endo.png', '').split('_')
-                video_id = parts[0]  # video01, video02, etc.
-                clip_nb = parts[1]   # clip number
-                # frame_nb is parts[3] but we don't need it for clip grouping
-            except (IndexError, ValueError):
-                # Fallback: treat entire split as one clip
-                video_id = "unknown"
-                clip_nb = "0"
-            
-            # Construct mask path
-            mask_file = masks_dir + filename
+            # Expect path like: cholecseg8k/videoXX/videoXX_YY/frame_000000_endo.png
+            parts = file.split("/")
+            if len(parts) < 4:
+                continue
 
+            video_folder = parts[-3]
+            clip_folder = parts[-2]
+            filename = parts[-1]
+
+            if not video_folder.startswith("video") or not clip_folder.startswith("video"):
+                continue
+
+            mask_file = file.replace("_endo.png", "_endo_mask.png")
             if mask_file not in all_files_set:
                 continue
 
-            # Create clip identifier
+            video_id = video_folder
+            clip_nb = clip_folder.split("_")[-1] if "_" in clip_folder else "0"
+
             clip_id = f"{video_id}/clip_{clip_nb}"
-            
+
             sample = {
                 "img": file,
                 "mask": mask_file,
@@ -179,12 +158,12 @@ class CholecSeg8kDataset(Dataset):
                 "clip": f"clip_{clip_nb}",
                 "clip_id": clip_id,
             }
-            
+
             # Organize by clip
             if clip_id not in self.clip_to_samples:
                 self.clip_to_samples[clip_id] = []
                 self.clip_ids.append(clip_id)
-            
+
             self.clip_to_samples[clip_id].append(sample)
 
         # Flatten samples for iteration
