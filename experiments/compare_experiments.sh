@@ -22,7 +22,13 @@ echo "========================================"
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
 CONTAINER=${PROJECT_ROOT}/atlasv2.sif
 
-DATASET=${1:-atlas}  # atlas | cholecseg8k
+# Default datasets to process
+DATASETS=(atlas cholecseg8k)
+
+# Allow override via command line
+if [ $# -gt 0 ]; then
+    DATASETS=("$@")
+fi
 
 # Default experiments to compare
 EXPERIMENTS=(
@@ -31,32 +37,36 @@ EXPERIMENTS=(
     "eomt_dinov3_vitl_256_seed0"
 )
 
-# Allow override via command line
-if [ $# -gt 1 ]; then
-    shift
-    EXPERIMENTS=("$@")
-fi
+cd ${PROJECT_ROOT} || exit 1
+
+# ===========================
+# Process each dataset
+# ===========================
+
+for DATASET in "${DATASETS[@]}"; do
+
+echo ""
+echo "========================================"
+echo "Processing dataset: ${DATASET}"
+echo "========================================"
 
 VISUALIZATIONS_ROOT=${PROJECT_ROOT}/outputs/visualizations_clips/${DATASET}
 OUTPUT_ROOT=${PROJECT_ROOT}/outputs/comparisons3/${DATASET}
 
 mkdir -p ${OUTPUT_ROOT}
 
-cd ${PROJECT_ROOT} || exit 1
-
 # ===========================
 # Process all clips
 # ===========================
 
 echo ""
-echo "Dataset: ${DATASET}"
 echo "Experiments: ${EXPERIMENTS[@]}"
 echo "Visualizations root: ${VISUALIZATIONS_ROOT}"
 echo ""
 
 if [ ! -d "${VISUALIZATIONS_ROOT}" ]; then
     echo "⚠️  Visualizations root not found: ${VISUALIZATIONS_ROOT}"
-    exit 1
+    continue
 fi
 
 clip_count=0
@@ -111,10 +121,16 @@ for clip_folder in ${CLIP_GLOB}; do
         --pwd /workspace \
         ${CONTAINER} \
         python3 compare_experiments.py \
-            --clip_dir "${clip_folder}" \
-            --experiments "${EXPERIMENTS[@]}" \
-            --output_dir "${output_dir}"
-    
+      Dataset ${DATASET} complete!"
+echo "Processed: ${processed_count}/${clip_count} clips"
+echo "Output root: ${OUTPUT_ROOT}"
+echo ""
+
+done  # End dataset loop
+
+echo ""
+echo "========================================"
+echo "All comparisons complete!
     if [ $? -eq 0 ]; then
         processed_count=$((processed_count + 1))
     fi
