@@ -1,6 +1,12 @@
+import os
+import sys
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
+current_dir = os.path.dirname(__file__)
+if current_dir not in sys.path:
+    sys.path.insert(0, current_dir)
 
 try:
     from .sam2.build_sam import build_sam2
@@ -9,12 +15,7 @@ except Exception as exc:
         raise ModuleNotFoundError(
             "Missing dependency 'hydra-core'. Install with: pip install hydra-core omegaconf"
         ) from exc
-    import os
-    import sys
-
-    current_dir = os.path.dirname(__file__)
-    if current_dir not in sys.path:
-        sys.path.insert(0, current_dir)
+    # Ensure local sam2_configs can be discovered by Hydra
     from sam2.build_sam import build_sam2
 
 
