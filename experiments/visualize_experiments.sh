@@ -35,7 +35,7 @@ cd ${PROJECT_ROOT} || exit 1
 # ===========================
 
 DATASET=atlas  # atlas | cholecseg8k
-NUM_CLIPS=5
+NUM_CLIPS=50
 CLIP_FPS=15
 SAVE_FPS=1
 MAX_FRAMES_PER_CLIP=10
