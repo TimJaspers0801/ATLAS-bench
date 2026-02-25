@@ -4,10 +4,11 @@ Compare predictions from multiple experiments on a single clip.
 Creates side-by-side visualizations for easy comparison of different models.
 
 Output structure:
-  <output_dir>/<frame_name>_comparison.png
+    <output_dir>/comparison.png
 
 Where each comparison image has columns:
-  [Image | GT | Experiment1 | Experiment2 | ... | ExperimentN]
+    [Image | GT | Experiment1 | Experiment2 | ... | ExperimentN]
+and rows for each saved frame in the clip.
 """
 
 import argparse
@@ -26,7 +27,7 @@ def get_sorted_frames(folder: str) -> list:
     return files
 
 
-def create_comparison_row(image_path, gt_path, pred_paths, frame_name: str):
+def create_comparison_row(image_path, gt_path, pred_paths, frame_name: str, target_size):
     """
     Create a horizontal comparison row.
     
@@ -35,45 +36,44 @@ def create_comparison_row(image_path, gt_path, pred_paths, frame_name: str):
         gt_path: Path to GT overlay
         pred_paths: Dict of {experiment_name: path_to_pred}
         frame_name: Name of frame for logging
+        target_size: (width, height) tuple for resizing
     
     Returns:
         Combined image array (H, W*num_cols, 3) or None if any image missing
     """
     images = []
     
-    # Load original image
-    if os.path.exists(image_path):
-        img = cv2.imread(image_path)
-        if img is not None:
-            images.append(img)
-    
-    # Load GT
-    if os.path.exists(gt_path):
-        gt = cv2.imread(gt_path)
-        if gt is not None:
-            images.append(gt)
-    
+    if not os.path.exists(image_path) or not os.path.exists(gt_path):
+        print(f"  ⚠️  Missing image or GT for frame: {frame_name}")
+        return None
+
+    img = cv2.imread(image_path)
+    gt = cv2.imread(gt_path)
+    if img is None or gt is None:
+        print(f"  ⚠️  Failed to load image or GT for frame: {frame_name}")
+        return None
+
+    images.append(img)
+    images.append(gt)
+
     # Load predictions in order
-    for exp_name in sorted(pred_paths.keys()):
+    for exp_name in pred_paths.keys():
         pred_path = pred_paths[exp_name]
-        if os.path.exists(pred_path):
-            pred = cv2.imread(pred_path)
-            if pred is not None:
-                images.append(pred)
+        if not os.path.exists(pred_path):
+            print(f"  ⚠️  Missing prediction for {exp_name} on frame: {frame_name}")
+            return None
+        pred = cv2.imread(pred_path)
+        if pred is None:
+            print(f"  ⚠️  Failed to load prediction for {exp_name} on frame: {frame_name}")
+            return None
+        images.append(pred)
     
     if not images:
         print(f"  ⚠️  No valid images found for frame: {frame_name}")
         return None
     
-    # Ensure all images have same height
-    heights = [img.shape[0] for img in images]
-    if len(set(heights)) > 1:
-        target_height = max(heights)
-        images = [
-            cv2.resize(img, (int(img.shape[1] * target_height / img.shape[0]), target_height))
-            if img.shape[0] != target_height else img
-            for img in images
-        ]
+    target_width, target_height = target_size
+    images = [cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_AREA) for img in images]
     
     # Stack horizontally
     comparison = np.hstack(images)
@@ -110,7 +110,14 @@ def compare_clip(
         print(f"  ⚠️  No frames found in {images_dir}")
         return 0
     
+    rows = []
     saved_count = 0
+    sample_frame = os.path.join(images_dir, frame_files[0])
+    sample_img = cv2.imread(sample_frame)
+    if sample_img is None:
+        print(f"  ⚠️  Failed to read sample frame: {frame_files[0]}")
+        return 0
+    target_size = (sample_img.shape[1], sample_img.shape[0])
     
     for frame_file in frame_files:
         frame_name = os.path.splitext(frame_file)[0]
@@ -123,26 +130,33 @@ def compare_clip(
         for exp_name in experiments:
             exp_dir = os.path.join(clip_dir, exp_name)
             pred_path = os.path.join(exp_dir, frame_file)
-            if os.path.exists(pred_path):
-                pred_paths[exp_name] = pred_path
-        
-        if not pred_paths:
-            if verbose:
-                print(f"  ⚠️  No experiment predictions found for {frame_file}")
-            continue
-        
-        # Create comparison
-        comparison = create_comparison_row(image_path, gt_path, pred_paths, frame_file)
+            pred_paths[exp_name] = pred_path
+
+        # Create comparison row
+        comparison = create_comparison_row(
+            image_path,
+            gt_path,
+            pred_paths,
+            frame_file,
+            target_size,
+        )
         if comparison is None:
             continue
-        
-        # Save
-        output_path = os.path.join(output_dir, f"{frame_name}_comparison.png")
-        cv2.imwrite(output_path, comparison)
+
+        rows.append(comparison)
         saved_count += 1
-    
+
+    if not rows:
+        if verbose:
+            print("  ⚠️  No comparison rows generated")
+        return 0
+
+    combined = np.vstack(rows)
+    output_path = os.path.join(output_dir, "comparison.png")
+    cv2.imwrite(output_path, combined)
+
     if verbose:
-        print(f"  ✓ Saved {saved_count} comparisons for {len(frame_files)} frames")
+        print(f"  ✓ Saved {saved_count} rows to {output_path}")
     
     return saved_count
 
