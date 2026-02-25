@@ -75,16 +75,18 @@ MODELS=(
     # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|32"
     
     # ATLAS models (temporal)
-    "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet_context|0|32"
     # "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0|32"
+    "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|32"
+    "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|32"
+    "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|32"
 
     # # EOMT SurgeNet models
     # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
 
     # EOMT ImageNet models 
     # "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|32"
-    "eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|32"
-    "eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|32"
+    # "eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|32"
+    # "eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|32"
 
 
     

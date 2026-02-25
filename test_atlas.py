@@ -203,12 +203,14 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
 
 def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: torch.device):
     """Load ATLAS model with temporal capabilities."""
-    from models.atlas.atlas import atlas_vitl_dinov3
+    from models.atlas.atlas import atlas_vitl_dinov3, atlas_vitb_dinov3, atlas_vits_dinov3, atlas_vitl_dinov3_tracking
     
     # Map model names to loader functions
     atlas_loaders = {
         "atlas_vitl_dinov3": atlas_vitl_dinov3,
-        "atlas_vitl_dinov3_context": atlas_vitl_dinov3,
+        "atlas_vitl_dinov3_tracking": atlas_vitl_dinov3_tracking,
+        "atlas_vitb_dinov3": atlas_vitb_dinov3,
+        "atlas_vits_dinov3": atlas_vits_dinov3,
     }
     
     if model_name not in atlas_loaders:
