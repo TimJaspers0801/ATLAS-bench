@@ -25,9 +25,9 @@ DATASET=${1:-atlas}  # atlas | cholecseg8k
 
 # Default experiments to compare
 EXPERIMENTS=(
-    "atlas_vitl_dinov3_surgenet"
-    "eomt_dinov3_vitl_surgenet_256"
-    "eomt_dinov3_vitl_256"
+    "atlas_vitl_dinov3_surgenet_seed0"
+    "eomt_dinov3_vitl_surgenet_256_seed0"
+    "eomt_dinov3_vitl_256_seed0"
 )
 
 # Allow override via command line
