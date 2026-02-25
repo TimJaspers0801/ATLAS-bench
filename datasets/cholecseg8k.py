@@ -42,6 +42,22 @@ CHOLECSEG8K_MAPPING = {
     12: 12, # Liver Ligament
 }
 
+COLOR_CLASS_MAPPING = {
+    (127, 127, 127): 0,  # Black Background
+    (210, 140, 140): 1,  # Abdominal Wall
+    (255, 114, 114): 2,  # Liver
+    (231, 70, 156): 3,   # Gastrointestinal Tract
+    (186, 183, 75): 4,   # Fat
+    (170, 255, 0): 5,    # Grasper
+    (255, 85, 0): 6,     # Connective Tissue
+    (255, 0, 0): 7,      # Blood
+    (255, 255, 0): 8,    # Cystic Duct
+    (169, 255, 184): 9,  # L-hook Electrocautery
+    (255, 160, 165): 10, # Gallbladder
+    (0, 50, 128): 11,    # Hepatic Vein
+    (111, 74, 0): 12,    # Liver Ligament
+}
+
 
 class CholecSeg8kDataset(Dataset):
     """
@@ -52,8 +68,10 @@ class CholecSeg8kDataset(Dataset):
             - video{nb}_{clip_nb}/
                 - frame_{framenum}_endo.png
                 - frame_{framenum}_endo_mask.png
+                - frame_{framenum}_endo_color_mask.png
 
         Frames and masks live in the same clip folder and are paired by filename.
+        Color masks are preferred when present.
     """
 
     def __init__(
@@ -135,8 +153,16 @@ class CholecSeg8kDataset(Dataset):
             if not video_folder.startswith("video") or not clip_folder.startswith("video"):
                 continue
 
-            mask_file = file.replace("_endo.png", "_endo_mask.png")
-            if mask_file not in all_files_set:
+            color_mask_file = file.replace("_endo.png", "_endo_color_mask.png")
+            gray_mask_file = file.replace("_endo.png", "_endo_mask.png")
+
+            if color_mask_file in all_files_set:
+                mask_file = color_mask_file
+                mask_type = "color"
+            elif gray_mask_file in all_files_set:
+                mask_file = gray_mask_file
+                mask_type = "gray"
+            else:
                 continue
 
             video_id = video_folder
@@ -147,6 +173,7 @@ class CholecSeg8kDataset(Dataset):
             sample = {
                 "img": file,
                 "mask": mask_file,
+                "mask_type": mask_type,
                 "filename": filename,
                 "video": video_id,
                 "clip": f"clip_{clip_nb}",
@@ -192,11 +219,14 @@ class CholecSeg8kDataset(Dataset):
 
         # Read image and mask
         image = self._read_from_zip(self.zf, sample["img"]).convert("RGB")
-        mask = self._read_from_zip(self.zf, sample["mask"]).convert("L")
 
-        # Apply class mapping to mask
-        mask = np.array(mask)
-        mask = self._remap_mask(mask)
+        if sample.get("mask_type") == "color":
+            mask_rgb = self._read_from_zip(self.zf, sample["mask"]).convert("RGB")
+            mask = self._color_mask_to_index(mask_rgb)
+        else:
+            mask_gray = self._read_from_zip(self.zf, sample["mask"]).convert("L")
+            mask = self._remap_mask(np.array(mask_gray))
+
         mask = Image.fromarray(mask.astype(np.uint8))
 
         # Convert to TVTensors
@@ -222,6 +252,18 @@ class CholecSeg8kDataset(Dataset):
             "video": sample["video"],  # video01, video02, etc.
             "clip": sample["clip"],  # clip_0, clip_1, etc.
         }
+
+    def _color_mask_to_index(self, mask_rgb):
+        """Convert RGB color mask to class indices."""
+        mask_arr = np.array(mask_rgb)
+        remapped = np.zeros((mask_arr.shape[0], mask_arr.shape[1]), dtype=np.uint8)
+
+        for color, class_id in COLOR_CLASS_MAPPING.items():
+            color_arr = np.array(color, dtype=np.uint8)
+            matches = np.all(mask_arr == color_arr, axis=-1)
+            remapped[matches] = class_id
+
+        return remapped
 
     def _remap_mask(self, mask):
         """Apply class mapping to mask."""
