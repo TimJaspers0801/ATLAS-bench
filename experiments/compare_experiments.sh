@@ -22,13 +22,18 @@ echo "========================================"
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
 
 DATASET=${1:-atlas}  # atlas | cholecseg8k
-shift
-EXPERIMENTS=("$@")  # Remaining args are experiment names
 
-if [ ${#EXPERIMENTS[@]} -eq 0 ]; then
-    echo "Usage: bash visualize_experiments.sh <dataset> <experiment1> [experiment2] ..."
-    echo "Example: bash compare_experiments.sh atlas atlas_vitl_dinov3_surgenet eomt_dinov3_vitl_surgenet_256"
-    exit 1
+# Default experiments to compare
+EXPERIMENTS=(
+    "atlas_vitl_dinov3_surgenet"
+    "eomt_dinov3_vitl_surgenet_256"
+    "eomt_dinov3_vitl_256"
+)
+
+# Allow override via command line
+if [ $# -gt 1 ]; then
+    shift
+    EXPERIMENTS=("$@")
 fi
 
 VISUALIZATIONS_ROOT=${PROJECT_ROOT}/outputs/visualizations_clips/${DATASET}
