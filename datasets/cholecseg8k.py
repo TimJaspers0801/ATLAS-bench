@@ -45,29 +45,27 @@ CHOLECSEG8K_MAPPING = {
 
 class CholecSeg8kDataset(Dataset):
     """
-    Zip-based CholecSeg8k dataset with train/val/test split.
-    
+    Zip-based CholecSeg8k dataset (no predefined splits).
+
         Dataset structure in zip (original):
         - cholecseg8k/
             - video{nb}/
                 - video{nb}_{clip_nb}/
                     - frame_{framenum}_endo.png
                     - frame_{framenum}_endo_mask.png
-    
+
         Frames and masks live in the same clip folder and are paired by filename.
     """
 
     def __init__(
         self,
         zip_path,
-        split,
         transform=None,
         first_frame_only=False,
         frame_percentage=100,
         seed=42,
         normalization_type="none",
     ):
-        assert split in {"train", "val", "test"}
         assert normalization_type in {"none", "surgical", "imagenet"}
         
         if not (1 <= frame_percentage <= 100):
@@ -75,7 +73,6 @@ class CholecSeg8kDataset(Dataset):
 
         self.zip_path = zip_path
         self.zf = None
-        self.split = split
         self.transform = transform
         self.first_frame_only = first_frame_only
         self.frame_percentage = frame_percentage
@@ -110,7 +107,6 @@ class CholecSeg8kDataset(Dataset):
         self._build_dataset()
 
         print(f"[CholecSeg8kDataset]")
-        print(f"  Split: {split}")
         print(f"  Samples: {len(self.samples)}")
         print(f"  Mode:",
               "first frame" if first_frame_only else
@@ -153,7 +149,6 @@ class CholecSeg8kDataset(Dataset):
                 "img": file,
                 "mask": mask_file,
                 "filename": filename,
-                "split": self.split,
                 "video": video_id,
                 "clip": f"clip_{clip_nb}",
                 "clip_id": clip_id,
@@ -223,7 +218,6 @@ class CholecSeg8kDataset(Dataset):
         return {
             "image": image,
             "mask": mask,
-            "split": sample["split"],
             "filename": sample["filename"],
             "procedure": "cholecseg8k",  # For compatibility with ATLAS evaluation
             "video": sample["video"],  # video01, video02, etc.

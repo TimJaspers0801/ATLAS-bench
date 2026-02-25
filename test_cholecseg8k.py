@@ -2,7 +2,7 @@
 Test script for benchmarking ATLAS-trained models on the CholecSeg8K dataset.
 
 This script evaluates ATLAS models on CholecSeg8K by:
-1. Combining all three splits (train/val/test) as one unified test set
+1. Loading the full dataset (no predefined splits)
 2. Mapping ATLAS's 30 output classes to CholecSeg8K's 13 classes
 3. Computing metrics on the mapped output
 
@@ -30,7 +30,7 @@ from tqdm import tqdm
 from collections import defaultdict
 import cv2
 
-from torch.utils.data import DataLoader, ConcatDataset
+from torch.utils.data import DataLoader
 from datasets.cholecseg8k import CholecSeg8kDataset, CHOLECSEG8K_CLASS_NAMES
 import torchvision.transforms.v2 as T
 import torch.nn.functional as F
@@ -585,7 +585,7 @@ def main(args):
     img_size = args.img_size if args.img_size != 256 else get_image_size(args.model)
     print(f"Image size: {img_size}")
     
-    # Create test dataset by combining all splits
+    # Create test dataset (no predefined splits)
     test_transform = T.Compose([
         T.Resize(img_size, interpolation=T.InterpolationMode.BICUBIC),
         T.CenterCrop(img_size),
@@ -598,42 +598,20 @@ def main(args):
     else:
         normalization_type = "surgical"
     
-    # Load all three splits and combine them
-    print("\nLoading CholecSeg8K dataset splits...")
-    train_dataset = CholecSeg8kDataset(
+    # Load dataset (no predefined splits)
+    print("\nLoading CholecSeg8K dataset...")
+    dataset = CholecSeg8kDataset(
         zip_path=args.data_path,
-        split="train",
-        transform=test_transform,
-        frame_percentage=args.test_percentage,
-        seed=args.seed,
-        normalization_type=normalization_type,
-    )
-    val_dataset = CholecSeg8kDataset(
-        zip_path=args.data_path,
-        split="val",
-        transform=test_transform,
-        frame_percentage=args.test_percentage,
-        seed=args.seed,
-        normalization_type=normalization_type,
-    )
-    test_dataset = CholecSeg8kDataset(
-        zip_path=args.data_path,
-        split="test",
         transform=test_transform,
         frame_percentage=args.test_percentage,
         seed=args.seed,
         normalization_type=normalization_type,
     )
     
-    # Combine all splits into one test set
-    combined_dataset = ConcatDataset([train_dataset, val_dataset, test_dataset])
-    print(f"Combined dataset size: {len(combined_dataset)} frames")
-    print(f"  - Train: {len(train_dataset)}")
-    print(f"  - Val: {len(val_dataset)}")
-    print(f"  - Test: {len(test_dataset)}")
+    print(f"Dataset size: {len(dataset)} frames")
     
     test_loader = DataLoader(
-        combined_dataset,
+        dataset,
         batch_size=args.batch_size,
         shuffle=False,  # IMPORTANT: maintain order for clips
         num_workers=args.num_workers,
@@ -664,7 +642,7 @@ def main(args):
             args.batch_size = 1
             # Recreate dataloader with batch_size=1
             test_loader = DataLoader(
-                combined_dataset,
+                dataset,
                 batch_size=args.batch_size,
                 shuffle=False,
                 num_workers=args.num_workers,
@@ -673,7 +651,7 @@ def main(args):
             )
     
     # Evaluate with class mapping
-    print(f"\nEvaluating on CholecSeg8K (all splits combined, {len(combined_dataset)} frames)...")
+    print(f"\nEvaluating on CholecSeg8K ({len(dataset)} frames)...")
     print("Class mapping pipeline:")
     print("  1. ATLAS 30 classes → CholecSeg8K 13 classes")
     print("  2. Evaluate on classes 1-6, 8-11 (background, blood, liver ligament excluded)")
@@ -716,8 +694,8 @@ def main(args):
         results = {
             "model": args.model,
             "checkpoint": args.checkpoint,
-            "dataset": "CholecSeg8K (combined train/val/test splits)",
-            "num_frames": len(combined_dataset),
+            "dataset": "CholecSeg8K (full dataset)",
+            "num_frames": len(dataset),
             "class_mapping": "ATLAS 30 classes -> CholecSeg8K 13 classes",
             "evaluation_classes": "1-6, 8-11 (foreground classes)",
             "excluded_classes": "0 (Background), 7 (Blood), 12 (Liver Ligament)",
