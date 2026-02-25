@@ -62,8 +62,14 @@ fi
 clip_count=0
 processed_count=0
 
-# Find all clip folders (three levels deep: procedure/video/clip)
-for clip_folder in ${VISUALIZATIONS_ROOT}/*/*/*; do
+# Find all clip folders (atlas: procedure/video/clip, cholecseg8k: video/clip)
+if [ "${DATASET}" = "atlas" ]; then
+    CLIP_GLOB="${VISUALIZATIONS_ROOT}/*/*/*"
+else
+    CLIP_GLOB="${VISUALIZATIONS_ROOT}/*/*"
+fi
+
+for clip_folder in ${CLIP_GLOB}; do
     if [ ! -d "${clip_folder}" ]; then
         continue
     fi
