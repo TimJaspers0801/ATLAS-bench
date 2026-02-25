@@ -4,7 +4,8 @@
 #SBATCH --cpus-per-task=16                      # Specify the number of CPUs/task
 #SBATCH --gpus=1                                # Specify the number of GPUs
 #SBATCH --partition=gpu_h100                    # Specify the node partition
-#SBATCH --time=4:00:00                          # Specify the maximum time the job can run
+#SBATCH --time=12:00:00                         # Specify the maximum time the job can run (increased from 4h to 12h)
+#SBATCH --signal=B:TERM@120                     # Send TERM signal 2 minutes before timeout for graceful cleanup
 
 # ===========================
 # Environment info
@@ -32,6 +33,12 @@ mkdir -p ${RESULTS_DIR}
 cd ${PROJECT_ROOT} || exit 1
 
 # ===========================
+# TRAP Handlers (for graceful cleanup)
+# ===========================
+
+trap 'echo "Script interrupted. Cleaning up..."; pkill -f "python3 test_atlas.py"; exit 130' INT TERM
+
+# ===========================
 # Dataset config
 # ===========================
 
@@ -57,12 +64,12 @@ BATCH_SIZE=32
 MODELS=(
     # DINOv2 Pretrained
     # "lh-vit-s-dinov2|None|lh_vits_dinov2_atlas|0|32"
-    "lh-vit-b-dinov2|None|lh_vitb_dinov2_atlas|0|32"
-    "lh-vit-l-dinov2|None|lh_vitl_dinov2_atlas|0|32"
+    "lh-vit-b-dinov2|best_model.pth|lh_vitb_dinov2_atlas|0|32"
+    "lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|32"
     
     # DINOv3 Pretrained
-    "lh-vit-b-dinov3|None|lh_vitb_dinov3_atlas|0|32"
-    "lh-vit-l-dinov3|None|lh_vitl_dinov3_atlas|0|32"
+    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|32"
+    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|32"
     
     # # DINOv1 SurgeNet2M
     # "lh-dinov1-vitb-224-surgenet2m|best_model.pth|lh_dinov1_vitb_224_surgenet2m_atlas|0|32"
@@ -163,8 +170,8 @@ for model_config in "${MODELS[@]}"; do
     
     echo "Running test with checkpoint: ${CHECKPOINT_PATH:-'None (pretrained)'}"
     
-    # Run test in container
-    apptainer exec --nv \
+    # Run test in container with timeout (30 minutes per model)
+    timeout 1800 apptainer exec --nv \
         --bind ${PROJECT_ROOT}:/workspace \
         --bind ${DATA_ZIP}:/data/atlas.zip \
         --pwd /workspace \
@@ -179,11 +186,15 @@ for model_config in "${MODELS[@]}"; do
             --seed ${SEED} \
             --output ${RESULT_FILE}
     
-    if [ $? -eq 0 ]; then
+    TEST_EXIT_CODE=$?
+    
+    if [ $TEST_EXIT_CODE -eq 0 ]; then
         echo "✅ Test completed successfully"
         echo "Results saved to: ${RESULT_FILE}"
+    elif [ $TEST_EXIT_CODE -eq 124 ]; then
+        echo "⏱️  Test timed out after 30 minutes - skipping this model"
     else
-        echo "❌ Test failed"
+        echo "❌ Test failed with exit code: $TEST_EXIT_CODE"
     fi
 done
 
@@ -192,6 +203,11 @@ echo "========================================"
 echo "All tests completed!"
 echo "Results saved in: ${RESULTS_DIR}"
 echo "========================================"
+
+# Final cleanup
+echo "Cleaning up processes..."
+pkill -f "python3 test_atlas.py" || true
+sleep 2
 
 # ===========================
 # Generate summary report
