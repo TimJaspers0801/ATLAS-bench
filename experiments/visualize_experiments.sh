@@ -34,7 +34,7 @@ cd ${PROJECT_ROOT} || exit 1
 # Dataset config
 # ===========================
 
-DATASET=atlas  # atlas | cholecseg8k
+DATASET=cholecseg8k  # atlas | cholecseg8k
 NUM_CLIPS=10
 CLIP_FPS=15
 SAVE_FPS=1
