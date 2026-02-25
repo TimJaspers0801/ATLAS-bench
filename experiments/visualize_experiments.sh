@@ -24,7 +24,7 @@ export HF_TOKEN=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
 
 PROJECT_ROOT=/gpfs/work5/0/tesr0602/Tim/atlas-bench/
 OUTPUT_ROOT_HOST=${PROJECT_ROOT}/outputs/visualizations_clips
-CONTAINER=${PROJECT_ROOT}/atlas.sif
+CONTAINER=${PROJECT_ROOT}/atlasv2.sif
 
 mkdir -p ${OUTPUT_ROOT_HOST}
 
