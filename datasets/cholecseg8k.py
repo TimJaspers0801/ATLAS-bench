@@ -51,7 +51,7 @@ class CholecSeg8kDataset(Dataset):
         - frames/
         - masks/
     
-    Frame format: video{XX}_nb_frame_{framenum}_endo.png
+    Frame format: video{XX}_{clips_nb}_frame_{framenum}_endo.png
     Masks: machine_masks (corresponding .png files)
     
     All frames are treated as part of a single "clip" for compatibility with AtlasDataset interface.
@@ -109,9 +109,10 @@ class CholecSeg8kDataset(Dataset):
         self.mean = [0.485, 0.456, 0.406]
         self.std = [0.229, 0.224, 0.225]
 
-        # Storage
-        self.samples = []
-        self.clip_id = f"cholecseg8k/{self.split_folder}"
+        # Storage for clip-aware sampling
+        self.clip_to_samples = {}  # {clip_id: [sample1, sample2, ...]}
+        self.clip_ids = []  # List of all clip IDs
+        self.samples = []  # Flattened list of all samples
 
         # Scan zip and build sample list
         self._build_dataset()
@@ -124,7 +125,7 @@ class CholecSeg8kDataset(Dataset):
               f"{frame_percentage}% frames")
 
     def _build_dataset(self):
-        """Scan zip file and build sample list."""
+        """Scan zip file and build sample list with clip-aware organization."""
         with zipfile.ZipFile(self.zip_path, "r") as zf:
             all_files = [p.lstrip("./") for p in zf.namelist() if not p.endswith("/")]
 
@@ -133,12 +134,24 @@ class CholecSeg8kDataset(Dataset):
 
         all_files_set = set(all_files)
 
-        # Collect frame files
+        # Collect frame files and organize by video/clip
         for file in all_files:
             if not file.startswith(frames_dir) or not file.lower().endswith('.png'):
                 continue
 
             filename = file[len(frames_dir):]
+            
+            # Parse filename: video{XX}_{clips_nb}_frame_{framenum}_endo.png
+            # Example: video01_1_frame_000000_endo.png
+            try:
+                parts = filename.replace('_endo.png', '').split('_')
+                video_id = parts[0]  # video01, video02, etc.
+                clip_nb = parts[1]   # clip number
+                # frame_nb is parts[3] but we don't need it for clip grouping
+            except (IndexError, ValueError):
+                # Fallback: treat entire split as one clip
+                video_id = "unknown"
+                clip_nb = "0"
             
             # Construct mask path
             mask_file = masks_dir + filename
@@ -146,13 +159,29 @@ class CholecSeg8kDataset(Dataset):
             if mask_file not in all_files_set:
                 continue
 
+            # Create clip identifier
+            clip_id = f"{video_id}/clip_{clip_nb}"
+            
             sample = {
                 "img": file,
                 "mask": mask_file,
                 "filename": filename,
                 "split": self.split,
+                "video": video_id,
+                "clip": f"clip_{clip_nb}",
+                "clip_id": clip_id,
             }
-            self.samples.append(sample)
+            
+            # Organize by clip
+            if clip_id not in self.clip_to_samples:
+                self.clip_to_samples[clip_id] = []
+                self.clip_ids.append(clip_id)
+            
+            self.clip_to_samples[clip_id].append(sample)
+
+        # Flatten samples for iteration
+        for clip_id in sorted(self.clip_ids):
+            self.samples.extend(self.clip_to_samples[clip_id])
 
         # Apply frame percentage sampling
         if self.frame_percentage < 100:
@@ -210,8 +239,8 @@ class CholecSeg8kDataset(Dataset):
             "split": sample["split"],
             "filename": sample["filename"],
             "procedure": "cholecseg8k",  # For compatibility with ATLAS evaluation
-            "video": self.split_folder,  # Use split folder as video identifier
-            "clip": self.clip_id,  # Single clip per split
+            "video": sample["video"],  # video01, video02, etc.
+            "clip": sample["clip"],  # clip_0, clip_1, etc.
         }
 
     def _remap_mask(self, mask):

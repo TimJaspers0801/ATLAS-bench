@@ -892,6 +892,12 @@ def evaluate_model_with_mapping(model, test_loader, device, num_atlas_classes, n
                 pred_np = preds_mapped[i].cpu().numpy()
                 gt_np = gt_masks_mapped[i].cpu().numpy()
                 
+                # Ensure 2D arrays (squeeze any extra dimensions)
+                if pred_np.ndim > 2:
+                    pred_np = pred_np.squeeze()
+                if gt_np.ndim > 2:
+                    gt_np = gt_np.squeeze()
+                
                 # --- Metric Collection ---
                 for c in classes_to_eval:
                     iou_c, dice_c = compute_class_metrics(pred_np, gt_np, c, ignore_index=ignore_index)
