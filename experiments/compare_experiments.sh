@@ -27,7 +27,7 @@ DATASET=${1:-atlas}  # atlas | cholecseg8k
 # Default experiments to compare
 EXPERIMENTS=(
     "atlas_vitl_dinov3_surgenet_seed0"
-    "eomt_dinov3_vitl_surgenet_256_seed0"
+    #"eomt_dinov3_vitl_surgenet_256_seed0"
     "eomt_dinov3_vitl_256_seed0"
 )
 
@@ -38,7 +38,7 @@ if [ $# -gt 1 ]; then
 fi
 
 VISUALIZATIONS_ROOT=${PROJECT_ROOT}/outputs/visualizations_clips/${DATASET}
-OUTPUT_ROOT=${PROJECT_ROOT}/outputs/comparisons/${DATASET}
+OUTPUT_ROOT=${PROJECT_ROOT}/outputs/comparisons3/${DATASET}
 
 mkdir -p ${OUTPUT_ROOT}
 
