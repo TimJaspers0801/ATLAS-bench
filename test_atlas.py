@@ -495,20 +495,23 @@ def main(args):
     )
     
     # For ATLAS models, enforce batch_size=1 for proper temporal processing
-    if args.model.startswith("atlas"):
-        if args.batch_size != 1:
+    # For non-ATLAS models, also use batch_size=1 for per-clip frame-by-frame evaluation
+    if args.batch_size != 1:
+        if args.model.startswith("atlas"):
             print(f"⚠️  Warning: ATLAS models require batch_size=1 for temporal query propagation.")
-            print(f"   Overriding batch_size from {args.batch_size} to 1")
-            args.batch_size = 1
-            # Recreate dataloader with batch_size=1
-            test_loader = DataLoader(
-                test_dataset,
-                batch_size=args.batch_size,
-                shuffle=False,
-                num_workers=args.num_workers,
-                pin_memory=True,
-                persistent_workers=True,
-            )
+        else:
+            print(f"⚠️  Warning: Using batch_size=1 for consistent per-clip frame-by-frame evaluation.")
+        print(f"   Overriding batch_size from {args.batch_size} to 1")
+        args.batch_size = 1
+        # Recreate dataloader with batch_size=1
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=True,
+            persistent_workers=True,
+        )
     
     # Evaluate
     print(f"\nEvaluating on test set...")

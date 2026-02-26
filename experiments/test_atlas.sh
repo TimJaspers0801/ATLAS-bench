@@ -45,7 +45,7 @@ trap 'echo "Script interrupted. Cleaning up..."; pkill -f "python3 test_atlas.py
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 NUM_CLASSES=30
 NUM_WORKERS=16
-BATCH_SIZE=32
+BATCH_SIZE=1  # All models use batch_size=1 for per-clip frame-by-frame evaluation
 
 # ===========================
 # Model-to-checkpoint mapping
@@ -53,8 +53,11 @@ BATCH_SIZE=32
 
 # Define all models to test
 # Format: "model_name|checkpoint_pattern|experiment_pattern|seed|batch_size"
-#
-# NOTE: Checkpoint naming conventions:
+# NOTE: All models use batch_size=1 for consistent per-clip frame-by-frame evaluation
+#   - ATLAS models: temporal query propagation across frames
+#   - Other models: frame-by-frame evaluation without temporal propagation
+# 
+# Checkpoint naming conventions:
 #   - VideoMT/EOMT models: save as "best_model.pth" (exact name)
 #   - Other models: save as "best_model_epoch_N_dice_X.XXXX.pt" (with metadata)
 #   
@@ -63,52 +66,52 @@ BATCH_SIZE=32
 #   - Falls back to glob pattern matching for best_model_*.pt variants
 MODELS=(
     # DINOv2 Pretrained
-    # "lh-vit-s-dinov2|None|lh_vits_dinov2_atlas|0|32"
-    "lh-vit-b-dinov2|best_model.pth|lh_vitb_dinov2_atlas|0|32"
-    "lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|32"
+    # "lh-vit-s-dinov2|None|lh_vits_dinov2_atlas|0|1"
+    "lh-vit-b-dinov2|best_model.pth|lh_vitb_dinov2_atlas|0|1"
+    "lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
     
     # DINOv3 Pretrained
-    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|32"
-    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|32"
+    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
+    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
     # SAM2-UNet 
-    "sam2unet|best_model.pth|sam2unet_atlas|0"
+    "sam2unet|best_model.pth|sam2unet_atlas|0|1"
     # SAM3-UNet 
-    "sam3unet|best_model.pth|sam3unet_atlas|0"
+    "sam3unet|best_model.pth|sam3unet_atlas|0|1"
     # # DINOv1 SurgeNet2M
-    # "lh-dinov1-vitb-224-surgenet2m|best_model.pth|lh_dinov1_vitb_224_surgenet2m_atlas|0|32"
+    # "lh-dinov1-vitb-224-surgenet2m|best_model.pth|lh_dinov1_vitb_224_surgenet2m_atlas|0|1"
     
     # # DINOv2 SurgeNet2M
-    # "lh-dinov2-vitb-336-surgenet2m|best_model.pth|lh_dinov2_vitb_336_surgenet2m_atlas|0|32"
+    # "lh-dinov2-vitb-336-surgenet2m|best_model.pth|lh_dinov2_vitb_336_surgenet2m_atlas|0|1"
     
     # # DINOv3 SurgeNet2M
-    # "lh-dinov3-vitb-256-surgenet2m|best_model.pth|lh_dinov3_vitb_256_surgenet2m_atlas|0|32"
-    # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|32"
+    # "lh-dinov3-vitb-256-surgenet2m|best_model.pth|lh_dinov3_vitb_256_surgenet2m_atlas|0|1"
+    # "lh-dinov3-vitl-256-surgenet2m|best_model.pth|lh_dinov3_vitl_256_surgenet2m_atlas|0|1"
     
     # ATLAS models (temporal)
-    "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0|32"
-    "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|32"
-    "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|32"
-    "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|32"
-    "atlas_vitb_dinov2|best_model.pth|atlas_vitb_dinov2_surgenet_336|0|32"
-    "atlas_vitb_dinov1|best_model.pth|atlas_vitb_dinov1_surgenet_224|0|32"
+    # "atlas_vitl_dinov3|best_model.pth|atlas_vitl_dinov3_surgenet|0|1"
+    # "atlas_vitb_dinov3|best_model.pth|atlas_vitb_dinov3_surgenet|0|1"
+    # "atlas_vits_dinov3|best_model.pth|atlas_vits_dinov3_surgenet|0|1"
+    # "atlas_vitl_dinov3_tracking|best_model.pth|atlas_vitl_dinov3_tracking_surgenet|0|1"
+    # "atlas_vitb_dinov2|best_model.pth|atlas_vitb_dinov2_surgenet_336|0|1"
+    # "atlas_vitb_dinov1|best_model.pth|atlas_vitb_dinov1_surgenet_224|0|1"
 
     # EOMT SurgeNet models
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|32"
+    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|1"
 
     # EOMT ImageNet models 
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|32"
-    "eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|32"
-    "eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|32"
+    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
+    "eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|1"
+    "eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|1"
 
     # # # SurgeNet Baselines
-    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|32"
-    "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|32"
-    "surgenet-caformer-s18|best_model.pth|caformer_atlas|0|32"
+    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|1"
+    "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|1"
+    "surgenet-caformer-s18|best_model.pth|caformer_atlas|0|1"
        
     # Other models 
-    "endofm|best_model.pth|endofm_atlas|0|32"
-    "endovit|best_model.pth|endovit_atlas|0|32"
-    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|32"
+    "endofm|best_model.pth|endofm_atlas|0|1"
+    "endovit|best_model.pth|endovit_atlas|0|1"
+    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|1"
 )
 
 # ===========================
