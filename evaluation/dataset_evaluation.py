@@ -66,14 +66,14 @@ def compute_mVC_for_clip(
     return float(np.mean(window_vcs))
 
 
-def evaluate_model(model, dataloader, device, num_classes):
+def evaluate_model(model, dataloader, device, num_classes, compute_ap=False):
     """
     Args:
         model: The model to evaluate.
         dataloader: The dataloader for evaluation.
         device: Device to use (cuda or cpu).
         num_classes: Number of classes.
-        threshold: Threshold for binary decisions.
+        compute_ap: If True, compute AP metrics (slower). If False, skip AP. Default False.
     """
     model.eval()
     
@@ -87,10 +87,10 @@ def evaluate_model(model, dataloader, device, num_classes):
     # Track predictions and GTs per clip for temporal consistency metrics
     clip_frames = defaultdict(lambda: {"preds": [], "gts": []})
 
-    # We still keep the AP logic as it was
+    # AP logic (only if compute_ap=True)
     clip_ap = {}
     current_clip = None
-    ap_evaluator = None
+    ap_evaluator = None if not compute_ap else None
 
     with torch.no_grad():
         for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
@@ -120,13 +120,20 @@ def evaluate_model(model, dataloader, device, num_classes):
             classes_to_eval = range(1, num_classes+1)  # Skip background 0
 
             for i in range(len(images)):
-                # --- AP Handling ---
-                clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
-                if current_clip != clip_id:
-                    if ap_evaluator is not None:
-                        clip_ap[current_clip] = ap_evaluator.evaluate()
-                    current_clip = clip_id
-                    ap_evaluator = SegmentationAPEvaluator()
+                # Safe extraction of clip ID
+                try:
+                    clip_id = f"{batch['procedure'][i]}/{batch['video'][i]}/{batch['clip'][i]}"
+                except (KeyError, TypeError, IndexError):
+                    # Fallback clip ID if metadata unavailable
+                    clip_id = f"unknown_{batch_idx}_{i}"
+                
+                # --- AP Handling (only if compute_ap=True) ---
+                if compute_ap:
+                    if current_clip != clip_id:
+                        if ap_evaluator is not None:
+                            clip_ap[current_clip] = ap_evaluator.evaluate()
+                        current_clip = clip_id
+                        ap_evaluator = SegmentationAPEvaluator()
 
                 pred_np = preds[i, 0].cpu().numpy()
                 gt_np = gt_masks[i].cpu().numpy().squeeze()
@@ -145,33 +152,34 @@ def evaluate_model(model, dataloader, device, num_classes):
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
 
-                # Binary AP logic with improved confidence scoring
-                gt_binary = (gt_np > 0).astype(np.uint8)
-                pred_binary = (pred_np > 0).astype(np.uint8)
-                
-                # Compute per-frame confidence score: average probability of predicted class in predicted mask
-                # Move to CPU to avoid large GPU tensor allocation
-                probs_np = probs[i].cpu().numpy()  # Shape: (num_classes, H, W)
-                preds_np = preds[i, 0].cpu().numpy()  # Shape: (H, W) - class index per pixel
-                
-                # Use advanced indexing to get prob of predicted class for each pixel
-                H, W = preds_np.shape
-                h_indices, w_indices = np.mgrid[0:H, 0:W]
-                pred_class_probs = probs_np[preds_np, h_indices, w_indices]  # Shape: (H, W)
-                pred_mask = (pred_np > 0)  # Mask of non-background predictions
-                
-                if pred_mask.sum() > 0:
-                    score = pred_class_probs[pred_mask].mean()
-                else:
-                    # If no mask predicted, use max probability as fallback
-                    score = probs_np.max()
-                
-                ap_evaluator.add_frame(gt_binary, pred_binary, score)
+                # Binary AP logic (only if compute_ap=True)
+                if compute_ap:
+                    gt_binary = (gt_np > 0).astype(np.uint8)
+                    pred_binary = (pred_np > 0).astype(np.uint8)
+                    
+                    # Compute per-frame confidence score: average probability of predicted class in predicted mask
+                    # Move to CPU to avoid large GPU tensor allocation
+                    probs_np = probs[i].cpu().numpy()  # Shape: (num_classes, H, W)
+                    preds_np = preds[i, 0].cpu().numpy()  # Shape: (H, W) - class index per pixel
+                    
+                    # Use advanced indexing to get prob of predicted class for each pixel
+                    H, W = preds_np.shape
+                    h_indices, w_indices = np.mgrid[0:H, 0:W]
+                    pred_class_probs = probs_np[preds_np, h_indices, w_indices]  # Shape: (H, W)
+                    pred_mask = (pred_np > 0)  # Mask of non-background predictions
+                    
+                    if pred_mask.sum() > 0:
+                        score = pred_class_probs[pred_mask].mean()
+                    else:
+                        # If no mask predicted, use max probability as fallback
+                        score = probs_np.max()
+                    
+                    ap_evaluator.add_frame(gt_binary, pred_binary, score)
             
             # Delete tensors to free memory immediately
             del images, gt_masks, outputs, probs, preds
 
-        if ap_evaluator is not None:
+        if compute_ap and ap_evaluator is not None:
             clip_ap[current_clip] = ap_evaluator.evaluate()
     
     # Final cleanup
@@ -257,6 +265,7 @@ def evaluate_atlas_temporal(
     device,
     num_classes,
     use_query_propagation=True,
+    compute_ap=False,
 ):
     """
     Evaluate ATLAS model with temporal processing on a clip basis.
@@ -272,6 +281,7 @@ def evaluate_atlas_temporal(
         device: torch device
         num_classes: number of segmentation classes
         use_query_propagation: whether to propagate query embeddings between frames
+        compute_ap: If True, compute AP metrics (slower). If False, skip AP. Default False.
     
     Returns:
         Dictionary of metrics (mIoU, Dice, AP, AP50, AP75, per_class metrics)
@@ -287,7 +297,7 @@ def evaluate_atlas_temporal(
     # Track predictions and GTs per clip for temporal consistency metrics
     clip_frames = defaultdict(lambda: {"preds": [], "gts": []})
     
-    # Track AP per clip
+    # Track AP per clip (only if compute_ap=True)
     clip_ap = {}
     current_clip = None
     ap_evaluator = None
@@ -314,10 +324,11 @@ def evaluate_atlas_temporal(
             
             # Reset query embeddings when entering a new clip
             if current_clip != clip_key:
-                if ap_evaluator is not None:
+                if compute_ap and ap_evaluator is not None:
                     clip_ap[current_clip] = ap_evaluator.evaluate()
                 current_clip = clip_key
-                ap_evaluator = SegmentationAPEvaluator()
+                if compute_ap:
+                    ap_evaluator = SegmentationAPEvaluator()
                 prev_query_embed = None  # Reset queries for new clip
             
             # Forward pass with query propagation
@@ -380,28 +391,29 @@ def evaluate_atlas_temporal(
                         class_ious[c].append(iou_c)
                         class_dices[c].append(dice_c)
                 
-                # --- Compute AP metrics (binary) ---
-                gt_binary = (gt_np > 0).astype(np.uint8)
-                pred_binary = (pred_np > 0).astype(np.uint8)
-                
-                # Compute per-frame confidence score
-                probs_np = class_logits[b].softmax(dim=-1)[:, :-1].max(dim=-1)[0].cpu().numpy()  # (num_q,)
-                mask_prob = mask_logits[b].sigmoid().cpu().numpy()  # (num_q, H, W)
-                
-                # Average confidence across queries and spatial dimensions
-                if mask_prob.sum() > 0:
-                    score = (mask_prob * probs_np[:, None, None]).sum() / mask_prob.sum()
-                else:
-                    score = 0.5
-                
-                ap_evaluator.add_frame(gt_binary, pred_binary, score)
+                # --- Compute AP metrics (binary, only if compute_ap=True) ---
+                if compute_ap and ap_evaluator is not None:
+                    gt_binary = (gt_np > 0).astype(np.uint8)
+                    pred_binary = (pred_np > 0).astype(np.uint8)
+                    
+                    # Compute per-frame confidence score
+                    probs_np = class_logits[b].softmax(dim=-1)[:, :-1].max(dim=-1)[0].cpu().numpy()  # (num_q,)
+                    mask_prob = mask_logits[b].sigmoid().cpu().numpy()  # (num_q, H, W)
+                    
+                    # Average confidence across queries and spatial dimensions
+                    if mask_prob.sum() > 0:
+                        score = (mask_prob * probs_np[:, None, None]).sum() / mask_prob.sum()
+                    else:
+                        score = 0.5
+                    
+                    ap_evaluator.add_frame(gt_binary, pred_binary, score)
             
             # Delete tensors to free memory immediately
             del images, gt_masks, mask_logits_per_block, class_logits_per_block, procedure_logits_per_block
             del per_pixel_logits, preds
     
-    # Finalize last clip's AP
-    if ap_evaluator is not None:
+    # Finalize last clip's AP (only if compute_ap=True)
+    if compute_ap and ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
     
     # Final cleanup
@@ -424,10 +436,15 @@ def evaluate_atlas_temporal(
     mIoU = np.mean(list(final_per_class_iou.values()))
     mDice = np.mean(list(final_per_class_dice.values()))
     
-    # AP Metrics
-    AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
-    AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
-    AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
+    # AP Metrics (set to 0.0 if not computed)
+    if compute_ap:
+        AP_total = np.mean([v["AP"] for v in clip_ap.values()]) if clip_ap else 0.0
+        AP_50 = np.mean([v["AP50"] for v in clip_ap.values()]) if clip_ap else 0.0
+        AP_75 = np.mean([v["AP75"] for v in clip_ap.values()]) if clip_ap else 0.0
+    else:
+        AP_total = 0.0
+        AP_50 = 0.0
+        AP_75 = 0.0
     
     # Compute temporal consistency (mVC) for different window sizes
     window_sizes = [8, 12, 24]

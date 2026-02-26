@@ -294,10 +294,10 @@ def load_atlas(model_name: str, checkpoint_path: str, num_classes: int, device: 
     return model.to(device)
 
 
-def evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation=True):
+def evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation=True, compute_ap=False):
     """Wrapper function that calls evaluate_atlas_temporal from evaluation module."""
     from evaluation.dataset_evaluation import evaluate_atlas_temporal as _evaluate_atlas_temporal
-    return _evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation)
+    return _evaluate_atlas_temporal(model, test_loader, device, num_classes, use_query_propagation, compute_ap)
 
 
 
@@ -523,14 +523,14 @@ def main(args):
     print(f"\nEvaluating on test set...")
 
     if args.model.startswith("atlas"):
-        # ATLAS models use temporal evaluation
-        metrics = evaluate_atlas_temporal(model, test_loader, device, args.num_classes)
+        # ATLAS models use temporal evaluation (compute_ap=False by default for speed)
+        metrics = evaluate_atlas_temporal(model, test_loader, device, args.num_classes, compute_ap=False)
     elif args.model.startswith("eomt"):
         # EOMT models were trained without background class (0), all classes shifted down by 1
-        metrics = evaluate_model(model, test_loader, device, args.num_classes)
+        metrics = evaluate_model(model, test_loader, device, args.num_classes, compute_ap=False)
     else:
         # Other models were also trained ignoring background
-        metrics = evaluate_model(model, test_loader, device, args.num_classes)
+        metrics = evaluate_model(model, test_loader, device, args.num_classes, compute_ap=False)
 
     # Save visualizations
     if args.visualize_samples > 0:
