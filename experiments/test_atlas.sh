@@ -67,8 +67,8 @@ BATCH_SIZE=1  # All models use batch_size=1 for per-clip frame-by-frame evaluati
 MODELS=(
     # DINOv2 Pretrained
     # "lh-vit-s-dinov2|None|lh_vits_dinov2_atlas|0|1"
-    "lh-vit-b-dinov2|best_model.pth|lh_vitb_dinov2_atlas|0|1"
-    "lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
+    #"lh-vit-b-dinov2|best_model.pth|lh_vitb_dinov2_atlas|0|1"
+    #"lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
     
     # DINOv3 Pretrained
     "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
