@@ -71,12 +71,12 @@ MODELS=(
     #"lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
     
     # DINOv3 Pretrained
-    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
-    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
+    #"lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
+    #"lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
     # SAM2-UNet 
-    "sam2unet|best_model.pth|sam2unet_atlas|0|1"
+    #"sam2unet|best_model.pth|sam2unet_atlas|0|1"
     # SAM3-UNet 
-    "sam3unet|best_model.pth|sam3unet_atlas|0|1"
+    #"sam3unet|best_model.pth|sam3unet_atlas|0|1"
     # # DINOv1 SurgeNet2M
     # "lh-dinov1-vitb-224-surgenet2m|best_model.pth|lh_dinov1_vitb_224_surgenet2m_atlas|0|1"
     
@@ -96,7 +96,7 @@ MODELS=(
     # "atlas_vitb_dinov1|best_model.pth|atlas_vitb_dinov1_surgenet_224|0|1"
 
     # EOMT SurgeNet models
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|1"
+    #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|1"
 
     # EOMT ImageNet models 
     #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
