@@ -99,7 +99,7 @@ MODELS=(
     #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|1"
 
     # EOMT ImageNet models 
-    #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
+    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
     #"eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|1"
     #"eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|1"
 
@@ -109,9 +109,9 @@ MODELS=(
     #"surgenet-caformer-s18|best_model.pth|caformer_atlas|0|1"
        
     # Other models 
-    "endofm|best_model.pth|endofm_atlas|0|1"
-    "endovit|best_model.pth|endovit_atlas|0|1"
-    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|1"
+    #"endofm|best_model.pth|endofm_atlas|0|1"
+    #"endovit|best_model.pth|endovit_atlas|0|1"
+    #"gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|1"
 )
 
 # ===========================
