@@ -71,8 +71,8 @@ MODELS=(
     #"lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
     
     # DINOv3 Pretrained
-    #"lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
-    #"lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
+    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
+    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
     # SAM2-UNet 
     #"sam2unet|best_model.pth|sam2unet_atlas|0|1"
     # SAM3-UNet 
@@ -99,7 +99,7 @@ MODELS=(
     #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_surgenet_256|0|1"
 
     # EOMT ImageNet models 
-    "eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
+    #"eomt_vitl_dinov3|best_model.pth|eomt_dinov3_vitl_256|0|1"
     #"eomt_vitb_dinov2|best_model.pth|eomt_dinov2_vitb_518|0|1"
     #"eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|1"
 
