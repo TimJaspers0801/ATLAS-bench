@@ -565,6 +565,9 @@ def main(args):
                 "AP": float(metrics["AP"]),
                 "AP50": float(metrics["AP50"]),
                 "AP75": float(metrics["AP75"]),
+                "mVC_8": float(metrics.get("mVC_8", 0.0)),
+                "mVC_12": float(metrics.get("mVC_12", 0.0)),
+                "mVC_24": float(metrics.get("mVC_24", 0.0)),
             }
         }
         
