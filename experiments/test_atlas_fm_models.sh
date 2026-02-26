@@ -104,14 +104,14 @@ MODELS=(
     #"eomt_vitb_dinov3|best_model.pth|eomt_dinov3_vitb_256|0|1"
 
     # # # SurgeNet Baselines
-    "surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|1"
-    "surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|1"
-    "surgenet-caformer-s18|best_model.pth|caformer_atlas|0|1"
+    #"surgenet-pvtv2-b2|best_model.pth|pvtv2_atlas|0|1"
+    #"surgenet-convnextv2-tiny|best_model.pth|convnextv2_atlas|0|1"
+    #"surgenet-caformer-s18|best_model.pth|caformer_atlas|0|1"
        
     # Other models 
     #"endofm|best_model.pth|endofm_atlas|0|1"
     #"endovit|best_model.pth|endovit_atlas|0|1"
-    #"gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|1"
+    "gastronet5m|best_model.pth|lh_gastronet5m_atlas|0|1"
 )
 
 # ===========================
