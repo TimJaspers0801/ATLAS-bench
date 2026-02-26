@@ -71,12 +71,12 @@ MODELS=(
     #"lh-vit-l-dinov2|best_model.pth|lh_vitl_dinov2_atlas|0|1"
     
     # DINOv3 Pretrained
-    "lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
-    "lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
+    #"lh-vit-b-dinov3|best_model.pth|lh_vitb_dinov3_atlas|0|1"
+    #"lh-vit-l-dinov3|best_model.pth|lh_vitl_dinov3_atlas|0|1"
     # SAM2-UNet 
-    #"sam2unet|best_model.pth|sam2unet_atlas|0|1"
+    "sam2unet|best_model.pth|sam2unet_atlas|0|1"
     # SAM3-UNet 
-    #"sam3unet|best_model.pth|sam3unet_atlas|0|1"
+    "sam3unet|best_model.pth|sam3unet_atlas|0|1"
     # # DINOv1 SurgeNet2M
     # "lh-dinov1-vitb-224-surgenet2m|best_model.pth|lh_dinov1_vitb_224_surgenet2m_atlas|0|1"
     
