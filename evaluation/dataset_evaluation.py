@@ -1,4 +1,5 @@
 import torch
+import gc
 from collections import defaultdict
 from tqdm import tqdm
 import numpy as np
@@ -92,12 +93,17 @@ def evaluate_model(model, dataloader, device, num_classes):
     ap_evaluator = None
 
     with torch.no_grad():
-        for batch in tqdm(dataloader, desc="Evaluating"):
+        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Evaluating")):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
 
             outputs = model(images)
             probs = torch.softmax(outputs, dim=1)
+            
+            # Periodic memory cleanup every 1000 iterations
+            if batch_idx > 0 and batch_idx % 1000 == 0:
+                torch.cuda.empty_cache()
+                gc.collect()
             
             # Resize logits to match ground truth dimensions using bilinear interpolation
             # This must happen BEFORE argmax (same as in training code)
@@ -161,9 +167,16 @@ def evaluate_model(model, dataloader, device, num_classes):
                     score = probs_np.max()
                 
                 ap_evaluator.add_frame(gt_binary, pred_binary, score)
+            
+            # Delete tensors to free memory immediately
+            del images, gt_masks, outputs, probs, preds
 
         if ap_evaluator is not None:
             clip_ap[current_clip] = ap_evaluator.evaluate()
+    
+    # Final cleanup
+    torch.cuda.empty_cache()
+    gc.collect()
 
     # --- FINAL DATASET AGGREGATION ---
 
@@ -283,9 +296,14 @@ def evaluate_atlas_temporal(
     prev_query_embed = None
     
     with torch.no_grad():
-        for batch in tqdm(test_loader, desc="Evaluating ATLAS temporal"):
+        for batch_idx, batch in enumerate(tqdm(test_loader, desc="Evaluating ATLAS temporal")):
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
+            
+            # Periodic memory cleanup every 1000 iterations
+            if batch_idx > 0 and batch_idx % 1000 == 0:
+                torch.cuda.empty_cache()
+                gc.collect()
             
             # Get clip information
             procedure = batch["procedure"][0] if isinstance(batch["procedure"], list) else batch["procedure"]
@@ -377,10 +395,18 @@ def evaluate_atlas_temporal(
                     score = 0.5
                 
                 ap_evaluator.add_frame(gt_binary, pred_binary, score)
+            
+            # Delete tensors to free memory immediately
+            del images, gt_masks, mask_logits_per_block, class_logits_per_block, procedure_logits_per_block
+            del per_pixel_logits, preds
     
     # Finalize last clip's AP
     if ap_evaluator is not None:
         clip_ap[current_clip] = ap_evaluator.evaluate()
+    
+    # Final cleanup
+    torch.cuda.empty_cache()
+    gc.collect()
     
     # --- Compute final metrics ---
     final_per_class_iou = {}

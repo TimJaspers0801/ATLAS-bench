@@ -44,7 +44,7 @@ trap 'echo "Script interrupted. Cleaning up..."; pkill -f "python3 test_atlas.py
 
 DATA_ZIP=/gpfs/work5/0/tesr0602/Tim/videomt/datasets/atlas/atlas.zip
 NUM_CLASSES=30
-NUM_WORKERS=16
+NUM_WORKERS=4  # Reduced for batch_size=1 to prevent worker hanging issues
 BATCH_SIZE=1  # All models use batch_size=1 for per-clip frame-by-frame evaluation
 
 # ===========================
@@ -176,8 +176,13 @@ for model_config in "${MODELS[@]}"; do
     
     echo "Running test with checkpoint: ${CHECKPOINT_PATH:-'None (pretrained)'}"
     
-    # Run test in container with timeout (30 minutes per model)
-    timeout 1800 apptainer exec --nv \
+    # Clean up any stale processes before starting
+    pkill -f "python3 test_atlas.py" 2>/dev/null || true
+    sleep 1
+    
+    # Run test in container with timeout (60 minutes per model)
+    # Using --cleanenv to ensure clean environment and proper cleanup
+    timeout --kill-after=120 3600 apptainer exec --cleanenv --nv \
         --bind ${PROJECT_ROOT}:/workspace \
         --bind ${DATA_ZIP}:/data/atlas.zip \
         --pwd /workspace \
@@ -194,11 +199,17 @@ for model_config in "${MODELS[@]}"; do
     
     TEST_EXIT_CODE=$?
     
+    # Clean up after test
+    pkill -f "python3 test_atlas.py" 2>/dev/null || true
+    sleep 2
+    
     if [ $TEST_EXIT_CODE -eq 0 ]; then
         echo "✅ Test completed successfully"
         echo "Results saved to: ${RESULT_FILE}"
     elif [ $TEST_EXIT_CODE -eq 124 ]; then
-        echo "⏱️  Test timed out after 30 minutes - skipping this model"
+        echo "⏱️  Test timed out after 60 minutes - skipping this model"
+    elif [ $TEST_EXIT_CODE -eq 137 ]; then
+        echo "⏱️  Test was killed after hard timeout - skipping this model"
     else
         echo "❌ Test failed with exit code: $TEST_EXIT_CODE"
     fi

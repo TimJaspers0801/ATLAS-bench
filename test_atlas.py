@@ -476,13 +476,18 @@ def main(args):
         normalization_type=normalization_type,
     )
     
+    # For batch_size=1, disable persistent_workers to prevent hanging
+    # and reduce num_workers as high parallelism is not beneficial
+    use_persistent_workers = args.batch_size > 1
+    eval_num_workers = min(args.num_workers, 4) if args.batch_size == 1 else args.num_workers
+    
     test_loader = DataLoader(
         test_dataset,
         batch_size=args.batch_size,
         shuffle=False,  # IMPORTANT: maintain order for clips
-        num_workers=args.num_workers,
+        num_workers=eval_num_workers,
         pin_memory=True,
-        persistent_workers=True,
+        persistent_workers=use_persistent_workers,
     )
     
     # Load model
@@ -504,13 +509,14 @@ def main(args):
         print(f"   Overriding batch_size from {args.batch_size} to 1")
         args.batch_size = 1
         # Recreate dataloader with batch_size=1
+        # Disable persistent_workers and reduce num_workers for stability
         test_loader = DataLoader(
             test_dataset,
             batch_size=args.batch_size,
             shuffle=False,
-            num_workers=args.num_workers,
+            num_workers=min(args.num_workers, 4),
             pin_memory=True,
-            persistent_workers=True,
+            persistent_workers=False,
         )
     
     # Evaluate
