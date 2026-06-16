@@ -183,50 +183,6 @@ class_names_surgenetseg75k  = {
     45: "Pancreas",
 }
 
-class_names_cholecseg8k = {
-    0: 'Black Background',
-    1: 'Abdominal Wall',
-    2: 'Liver',
-    3: 'Gastrointestinal Tract',
-    4: 'Fat',
-    5: 'Grasper',
-    6: 'Connective Tissue',
-    7: 'L-hook Electrocautery',
-    8: 'Gallbladder'
-}
-
-# Remapping from SurgeNetSeg-75k→CholecSeg
-orig_to_ch8k = {
-    0: 0,    # Background
-    7: 1,    # Abdominal Wall
-    12: 2,   # Liver
-    5: 3,    # GI Tract ← Small intestine
-    6: 3,    # GI Tract ← Colon/rectum
-    18: 3,   # GI Tract ← Stomach
-    9: 4,    # Omentum ← Fat
-    20: 4,   # Mesenterium ← Fat
-    1: 5,    # Grasper ← Tools/Camera
-    14: 8    # Gallbladder
-}
-
-# helper: map a mask tensor in-place
-def remap_cholecseg_mask(mask: torch.Tensor):
-    # mask is H×W with values in 0–45
-    mapped = torch.zeros_like(mask)
-    for orig_lbl, new_lbl in orig_to_ch8k.items():
-        mapped[mask == orig_lbl] = new_lbl
-    return mapped
-
-
-def collapse_cholecseg_preds(preds: torch.Tensor) -> torch.Tensor:
-    """
-    Merge L-hook (7) into Grasper (5) in the model’s predictions.
-    Expects preds to be an H×W tensor with values in {0,…,8}.
-    """
-    collapsed = preds.clone()
-    collapsed[preds == 7] = 5
-    return collapsed
-
 
 def compute_mVC_for_clip(preds_list: List[np.ndarray],
                          gts_list: List[np.ndarray],

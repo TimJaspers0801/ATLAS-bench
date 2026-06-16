@@ -36,7 +36,7 @@ cd ${PROJECT_ROOT} || exit 1
 # TRAP Handlers (for graceful cleanup)
 # ===========================
 
-trap 'echo "Script interrupted. Cleaning up..."; pkill -f "python3 test_atlas.py"; exit 130' INT TERM
+trap 'echo "Script interrupted. Cleaning up..."; pkill -f "python3 test_atlas120k.py"; exit 130' INT TERM
 
 # ===========================
 # Dataset config
@@ -58,7 +58,7 @@ BATCH_SIZE=1  # All models use batch_size=1 for per-clip frame-by-frame evaluati
 #   - Other models: frame-by-frame evaluation without temporal propagation
 # 
 # Checkpoint naming conventions:
-#   - VideoMT/EOMT models: save as "best_model.pth" (exact name)
+#   - EOMT/ATLAS models: save as "best_model.pth" (exact name)
 #   - Other models: save as "best_model_epoch_N_dice_X.XXXX.pt" (with metadata)
 #   
 # The script automatically handles both patterns:
@@ -143,7 +143,7 @@ for model_config in "${MODELS[@]}"; do
     if [ "${CHECKPOINT_PATTERN}" != "None" ]; then
         CHECKPOINT_PATH=""
         
-        # Try exact match first (for videomt/eomt with simple best_model.pth)
+        # Try exact match first (for eomt/atlas with simple best_model.pth)
         if [ -f "${OUTPUT_PATH}/${CHECKPOINT_PATTERN}" ]; then
             CHECKPOINT_PATH="${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
         else
@@ -177,7 +177,7 @@ for model_config in "${MODELS[@]}"; do
     echo "Running test with checkpoint: ${CHECKPOINT_PATH:-'None (pretrained)'}"
     
     # Clean up any stale processes before starting
-    pkill -f "python3 test_atlas.py" 2>/dev/null || true
+    pkill -f "python3 test_atlas120k.py" 2>/dev/null || true
     sleep 1
     
     # Run test in container with timeout (60 minutes per model)
@@ -187,7 +187,7 @@ for model_config in "${MODELS[@]}"; do
         --bind ${DATA_ZIP}:/data/atlas.zip \
         --pwd /workspace \
         ${CONTAINER} \
-        python3 test_atlas.py \
+        python3 test_atlas120k.py \
             --model ${MODEL_NAME} \
             ${CHECKPOINT_ARG} \
             --data_path /data/atlas.zip \
@@ -200,7 +200,7 @@ for model_config in "${MODELS[@]}"; do
     TEST_EXIT_CODE=$?
     
     # Clean up after test
-    pkill -f "python3 test_atlas.py" 2>/dev/null || true
+    pkill -f "python3 test_atlas120k.py" 2>/dev/null || true
     sleep 2
     
     if [ $TEST_EXIT_CODE -eq 0 ]; then
@@ -223,7 +223,7 @@ echo "========================================"
 
 # Final cleanup
 echo "Cleaning up processes..."
-pkill -f "python3 test_atlas.py" || true
+pkill -f "python3 test_atlas120k.py" || true
 sleep 2
 
 # ===========================

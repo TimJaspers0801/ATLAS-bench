@@ -2,17 +2,12 @@
 Test script for benchmarking all models on the ATLAS dataset.
 
 Supports:
-- Image-based models (DINOv2, DINOv3, SurgeNet variants, EOMT)
-- Video-based models (VideoMT with online processing)
+- Image-based models (DINOv2, DINOv3, SurgeNet variants)
 - Frame-by-frame evaluation on test set
 
 Usage:
-    python test_atlas.py --model lh-dinov3-vitl-256-surgenet2m \\
+    python test_atlas120k.py --model lh-dinov3-vitl-256-surgenet2m \\
                          --checkpoint weights/DINOv3-vitl-256-surgenet2m.pth \\
-                         --data_path atlas.zip
-    
-    python test_atlas.py --model videomt \\
-                         --checkpoint checkpoints/videomt.pth \\
                          --data_path atlas.zip
 """
 
@@ -118,7 +113,7 @@ def get_image_size(model_name: str) -> int:
     # Special case: eomt_dinov2 models use 518x518
     if "eomt" in model_name and "dinov2" in model_name:
         return 518
-    
+
     # SAM2-UNet uses 256x256
     if "sam2unet" in model_name:
         return 256
@@ -157,7 +152,6 @@ def load_model(model_name: str, checkpoint_path: str, num_classes: int, device: 
         raise ValueError(
             f"Unknown model: {model_name}. Available models:\n"
             f"  Image-based: {', '.join(MODEL_REGISTRY.keys())}\n"
-            f"  Video-based: videomt\n"
             f"  EOMT variants: eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2, "
             f"eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3\n"
             f"  ATLAS (temporal): atlas_vitl_dinov3"
@@ -170,8 +164,7 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         eomt_vits_dinov2, eomt_vitb_dinov2, eomt_vitl_dinov2,
         eomt_vits_dinov3, eomt_vitb_dinov3, eomt_vitl_dinov3
     )
-    
-    # Map model names to loader functions
+
     eomt_loaders = {
         "eomt_vits_dinov2": eomt_vits_dinov2,
         "eomt_vitb_dinov2": eomt_vitb_dinov2,
@@ -180,49 +173,40 @@ def load_eomt(model_name: str, checkpoint_path: str, num_classes: int, device: t
         "eomt_vitb_dinov3": eomt_vitb_dinov3,
         "eomt_vitl_dinov3": eomt_vitl_dinov3,
     }
-    
+
     if model_name not in eomt_loaders:
         raise ValueError(
             f"Unknown EOMT variant: {model_name}. Available: {', '.join(eomt_loaders.keys())}"
         )
-    
+
     print(f"Loading EOMT model: {model_name}")
     model = eomt_loaders[model_name](num_classes=num_classes)
-    
+
     if checkpoint_path and os.path.isfile(checkpoint_path):
         print(f"Loading EOMT checkpoint: {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-        
-        # Extract state dict from checkpoint
+
         if isinstance(checkpoint, dict) and "model" in checkpoint:
             state_dict = checkpoint["model"]
         else:
             state_dict = checkpoint
-        
-        # First pass: understand what format the checkpoint is in
+
         has_timm_keys = any("patch_embed" in k or "blocks" in k for k in state_dict.keys() if k.startswith("network.encoder.backbone"))
         has_hf_keys = any("embeddings" in k or "layer" in k for k in state_dict.keys() if k.startswith("network.encoder.backbone"))
-        
-        # Transform keys
+
         new_state_dict = {}
         for key, value in state_dict.items():
-            # Skip criterion keys (training-only)
             if key.startswith("criterion."):
                 continue
-            
-            # Strip "network." prefix from Lightning wrapper
-            new_key = key[8:] if key.startswith("network.") else key  # len("network.") = 8
-            
-            # If checkpoint has TIMM format but we need HF format, convert
+            new_key = key[8:] if key.startswith("network.") else key
             if has_timm_keys and not has_hf_keys:
                 new_key = new_key.replace("encoder.backbone.patch_embed.", "encoder.backbone.embeddings.")
                 new_key = new_key.replace("encoder.backbone.blocks.", "encoder.backbone.layer.")
-            
             new_state_dict[new_key] = value
-        
+
         msg = model.load_state_dict(new_state_dict, strict=False)
         print(msg)
-        
+
     return model.to(device)
 
 
@@ -308,7 +292,6 @@ def save_random_visualizations(
     output_dir,
     num_samples,
     img_size,
-    is_videomt,
     is_atlas,
     seed,
     mask_background=False,
@@ -317,57 +300,34 @@ def save_random_visualizations(
         return
 
     os.makedirs(output_dir, exist_ok=True)
-    
+
     mean = torch.tensor(dataloader.dataset.mean).view(3, 1, 1)
     std = torch.tensor(dataloader.dataset.std).view(3, 1, 1)
 
     with torch.no_grad():
-        current_video = None
         current_clip = None
         prev_query_embed = None
         sample_count = 0
-        
+
         for batch in tqdm(dataloader, desc="Collecting visualizations"):
             if sample_count >= num_samples:
                 break
-                
+
             images = batch["image"].to(device)
             gt_masks = batch["mask"].to(device)
-            
+
             # Get clip info
             procedure = batch["procedure"][0] if isinstance(batch["procedure"], list) else batch["procedure"]
             video = batch["video"][0] if isinstance(batch["video"], list) else batch["video"]
             clip_id = batch["clip"][0] if isinstance(batch["clip"], list) else batch["clip"]
             clip_key = f"{procedure}/{video}/{clip_id}"
-            
+
             # Reset queries when entering a new clip (for ATLAS)
             if is_atlas and current_clip != clip_key:
                 current_clip = clip_key
                 prev_query_embed = None
 
-            if is_videomt:
-                batch_video = f"{batch['procedure'][0]}/{batch['video'][0]}"
-                if batch_video != current_video:
-                    model.reset_memory()
-                    current_video = batch_video
-
-                images_denorm = images.cpu() * std + mean
-                images_denorm = images_denorm.clamp(0.0, 1.0)
-                images_denorm = images_denorm.to(device)
-
-                outputs_list = []
-                for i in range(images.shape[0]):
-                    frame = images_denorm[i:i+1]
-                    outputs_list.append(model.forward_frame(frame))
-
-                pred_logits = torch.cat([o['pred_logits'] for o in outputs_list], dim=0)
-                pred_masks = torch.cat([o['pred_masks'] for o in outputs_list], dim=0)
-
-                mask_cls = F.softmax(pred_logits, dim=-1)[:, :, :-1]
-                pred_masks_prob = torch.sigmoid(pred_masks)
-                semseg = torch.einsum("bqc,bqhw->bchw", mask_cls, pred_masks_prob)
-                preds = semseg.argmax(dim=1)
-            elif is_atlas:
+            if is_atlas:
                 # ATLAS model with query propagation
                 outputs = model(
                     images,
@@ -525,18 +485,13 @@ def main(args):
     if args.model.startswith("atlas"):
         # ATLAS models use temporal evaluation (compute_ap=False by default for speed)
         metrics = evaluate_atlas_temporal(model, test_loader, device, args.num_classes, compute_ap=False)
-    elif args.model.startswith("eomt"):
-        # EOMT models were trained without background class (0), all classes shifted down by 1
-        metrics = evaluate_model(model, test_loader, device, args.num_classes, compute_ap=False)
     else:
-        # Other models were also trained ignoring background
         metrics = evaluate_model(model, test_loader, device, args.num_classes, compute_ap=False)
+
 
     # Save visualizations
     if args.visualize_samples > 0:
         output_dir = os.path.join(args.visualize_dir, args.model)
-        # Determine if we should mask background (all models except VideoMT)
-        mask_bg = not (args.model == "videomt")
         save_random_visualizations(
             model=model,
             dataloader=test_loader,
@@ -544,10 +499,9 @@ def main(args):
             output_dir=output_dir,
             num_samples=args.visualize_samples,
             img_size=img_size,
-            is_videomt=(args.model == "videomt"),
             is_atlas=args.model.startswith("atlas"),
             seed=args.seed,
-            mask_background=mask_bg,
+            mask_background=True,
         )
         print(f"\nSaved {args.visualize_samples} visualizations to: {output_dir}")
     
@@ -586,7 +540,7 @@ if __name__ == "__main__":
         "--model",
         type=str,
         required=True,
-        help="Model name (see MODEL_REGISTRY or use 'videomt')"
+        help="Model name (see MODEL_REGISTRY)"
     )
     parser.add_argument(
         "--checkpoint",
@@ -654,12 +608,5 @@ if __name__ == "__main__":
         default="outputs/visualizations",
         help="Directory to save visualization images"
     )
-    parser.add_argument(
-        "--videomt_window",
-        type=int,
-        default=4,
-        help="Window size for VideoMT clip processing to limit memory usage"
-    )
-    
     args = parser.parse_args()
     metrics = main(args)

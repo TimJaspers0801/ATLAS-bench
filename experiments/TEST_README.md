@@ -44,7 +44,7 @@ chmod +x test_atlas_local.sh
 Test any model directly:
 
 ```bash
-python test_atlas.py \
+python test_atlas120k.py \
     --model lh-dinov3-vitl-256-surgenet2m \
     --checkpoint outputs/lh_dinov3_vitl_256_surgenet2m_atlas_seed0/best_model.pth \
     --data_path atlas.zip \
@@ -74,15 +74,11 @@ The scripts test these model categories:
    - surgenet-convnextv2-tiny
    - surgenet-caformer-s18
 
-5. **VideoMT** (checkpoint required, batch_size=1)
-   - videomt (seeds: 0, 1, 2)
-   - Note: Uses online processing with temporal memory
-
 ### Expected Directory Structure
 
 ```
 atlas-bench/
-├── test_atlas.py
+├── test_atlas120k.py
 ├── experiments/
 │   ├── test_atlas.sh
 │   └── test_atlas_local.sh
@@ -142,7 +138,7 @@ MODELS=(
 
 Format: `"model_name|checkpoint_pattern|experiment_pattern|seed|batch_size"`
 - Use `None` for checkpoint_pattern if pretrained model
-- batch_size is optional and defaults to 32 (use 1 for VideoMT)
+- batch_size is optional and defaults to 32
 
 ### Change Batch Size
 
@@ -160,16 +156,6 @@ MODELS=(
 )
 ```
 
-For VideoMT (requires batch_size=1):
-
-```bash
-MODELS=(
-    "videomt|best_model.pth|videomt_atlas|0|1"
-    "videomt|best_model.pth|videomt_atlas|1|1"
-    "videomt|best_model.pth|videomt_atlas|2|1"
-)
-```
-
 ## Troubleshooting
 
 **Checkpoint not found:**
@@ -184,25 +170,3 @@ MODELS=(
 **Missing data file:**
 - Update `DATA_ZIP` path in the script
 - Ensure atlas.zip is accessible
-
-## VideoMT Testing
-
-VideoMT is a video-based model with online processing that maintains temporal state across frames.
-**It requires batch_size=1** to properly track temporal memory.
-
-VideoMT is already included in the test scripts with all 3 seeds:
-- videomt_atlas_seed0
-- videomt_atlas_seed1  
-- videomt_atlas_seed2
-
-To test VideoMT manually:
-
-```bash
-python test_atlas.py \
-    --model videomt \
-    --checkpoint outputs/videomt_atlas_seed0/best_model.pth \
-    --data_path atlas.zip \
-    --batch_size 1
-```
-
-VideoMT processes frames sequentially with temporal memory.

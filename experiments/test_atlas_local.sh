@@ -34,7 +34,7 @@ if [ $# -eq 2 ]; then
     
     RESULT_FILE="${RESULTS_DIR}/$(basename ${CHECKPOINT_PATH%.*})_test_results.json"
     
-    python test_atlas.py \
+    python test_atlas120k.py \
         --model ${MODEL_NAME} \
         --checkpoint ${CHECKPOINT_PATH} \
         --data_path ${DATA_ZIP} \
@@ -79,12 +79,7 @@ else
         "surgenet-pvtv2-b2|outputs/pvtv2_atlas_seed0/best_model.pth|pvtv2_atlas_seed0|32"
         "surgenet-convnextv2-tiny|outputs/convnextv2_atlas_seed0/best_model.pth|convnextv2_atlas_seed0|32"
         "surgenet-caformer-s18|outputs/caformer_atlas_seed0/best_model.pth|caformer_atlas_seed0|32"
-        
-        # VideoMT (requires batch_size=1 for online processing)
-        "videomt|outputs/videomt_atlas_seed0/best_model.pth|videomt_atlas_seed0|1"
-        "videomt|outputs/videomt_atlas_seed1/best_model.pth|videomt_atlas_seed1|1"
-        "videomt|outputs/videomt_atlas_seed2/best_model.pth|videomt_atlas_seed2|1"
-        
+
         # Other models (commented out by default)
         # "endofm|outputs/endofm_atlas_seed0/best_model.pth|endofm_atlas_seed0|32"
         # "endovit|outputs/endovit_atlas_seed0/best_model.pth|endovit_atlas_seed0|32"
@@ -119,7 +114,7 @@ else
         
         RESULT_FILE="${RESULTS_DIR}/${EXPERIMENT_NAME}_test_results.json"
         
-        python test_atlas.py \
+        python test_atlas120k.py \
             --model ${MODEL_NAME} \
             ${CHECKPOINT_ARG} \
             --data_path ${DATA_ZIP} \

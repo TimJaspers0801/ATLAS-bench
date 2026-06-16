@@ -70,7 +70,7 @@ for SEED in "${SEEDS[@]}"; do
     --bind ${PROJECT_ROOT}:/workspace \
     --bind ${OUTPUT_ROOT_HOST}:/outputs \
     ${CONTAINER} \
-    python3 /workspace/train_frame_level.py \
+    python3 /workspace/train_atlas120k.py \
       --data_path ${DATA_ZIP} \
       --experiment_name ${EXPERIMENT_NAME} \
       --model lh-vit-l-dinov2 \
@@ -105,7 +105,7 @@ done
 #     --bind ${PROJECT_ROOT}:/workspace \
 #     --bind ${OUTPUT_ROOT_HOST}:/outputs \
 #     ${CONTAINER} \
-#     python3 /workspace/train_frame_level.py \
+#     python3 /workspace/train_atlas120k.py \
 #       --data_path ${DATA_ZIP} \
 #       --experiment_name ${EXPERIMENT_NAME} \
 #       --model lh-vit-b-dinov2 \
@@ -139,7 +139,7 @@ done
 #     --bind ${PROJECT_ROOT}:/workspace \
 #     --bind ${OUTPUT_ROOT_HOST}:/outputs \
 #     ${CONTAINER} \
-#     python3 /workspace/train_frame_level.py \
+#     python3 /workspace/train_atlas120k.py \
 #       --data_path ${DATA_ZIP} \
 #       --experiment_name ${EXPERIMENT_NAME} \
 #       --model lh-vit-s-dinov2 \

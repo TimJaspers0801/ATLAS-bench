@@ -45,9 +45,9 @@ NUM_CLASSES=30
 # Format: "model_name|checkpoint_pattern|experiment_pattern|seed"
 #
 # NOTE: Checkpoint naming conventions:
-#   - VideoMT/EOMT/ATLAS models: save as "best_model.pth" (exact name)
+#   - EOMT/ATLAS models: save as "best_model.pth" (exact name)
 #   - Other models: save as "best_model_epoch_N_dice_X.XXXX.pt" (with metadata)
-#   
+#
 # The script automatically handles both patterns:
 #   - Tries exact match first (for best_model.pth)
 #   - Falls back to glob pattern matching for best_model_*.pt variants
@@ -135,7 +135,7 @@ for model_config in "${MODELS[@]}"; do
     if [ "${CHECKPOINT_PATTERN}" != "None" ]; then
         CHECKPOINT_PATH=""
         
-        # Try exact match first (for videomt/eomt/atlas with simple best_model.pth)
+        # Try exact match first (for eomt/atlas with simple best_model.pth)
         if [ -f "${OUTPUT_PATH}/${CHECKPOINT_PATTERN}" ]; then
             CHECKPOINT_PATH="${OUTPUT_PATH}/${CHECKPOINT_PATTERN}"
         else

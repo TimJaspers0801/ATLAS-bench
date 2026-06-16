@@ -24,11 +24,10 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
 
-# Import model loading functions from test_atlas.py
-from test_atlas import (
+# Import model loading functions from test_atlas120k.py
+from test_atlas120k import (
     load_model,
     get_image_size,
-    MODEL_REGISTRY,
 )
 
 
@@ -342,7 +341,7 @@ def parse_test_atlas_models():
         # EOMT SurgeNet models
         ("eomt_vitl_dinov3", "best_model.pth", "eomt_dinov3_vitl_surgenet_256", 0, 32),
 
-        # EOMT ImageNet models 
+        # EOMT ImageNet models
         ("eomt_vitl_dinov3", "best_model.pth", "eomt_dinov3_vitl_256", 0, 32),
         ("eomt_vitb_dinov2", "best_model.pth", "eomt_dinov2_vitb_518", 0, 32),
         ("eomt_vitb_dinov3", "best_model.pth", "eomt_dinov3_vitb_256", 0, 32),

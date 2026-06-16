@@ -1,5 +1,6 @@
-outputs
-data
-wandb
-weights
+outputs/
+data/
+wandb/
+weights/
 models/EndoFM/checkpoints/*.pth
+experiments/
