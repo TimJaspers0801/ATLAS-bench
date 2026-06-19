@@ -13,14 +13,16 @@
 
 ATLAS-Bench evaluates semantic segmentation models on the [ATLAS-120k](https://huggingface.co/TimJaspersTue/datasets/atlas-120k) surgical anatomy dataset — 120k annotated frames from 100 surgical videos across 14 procedures and 42 anatomical classes.
 
+Scope note: in this repository, SOTA baseline and foundation models are trained and evaluated. ATLAS and EOMT models are trained in [ATLAS-model](https://github.com/rlpddejong/ATLAS-model) and are evaluated here.
+
 This repository is part of the broader ATLAS project:
 
 | Repository | Description |
 |---|---|
-| [ATLAS-120k]() | Dataset download and processing scripts |
+| [ATLAS-120k](https://github.com/TimJaspers0801/ATLAS) | Dataset download and processing scripts |
 | [ATLAS-interactive](https://github.com/rlpddejong/ATLAS-Interactive) | Annotation platform and interactive segmentation tools |
-| [ATLAS-model]() | ATLAS model implementation and training code |
-| **This repo** | Benchmark experiments of various SOTA models |
+| [ATLAS-model](https://github.com/rlpddejong/ATLAS-model) | ATLAS model implementation and training code |
+| **This repo** | Training/evaluation benchmark for SOTA baselines; evaluation for ATLAS and EOMT models |
 | [SurgeNetDINO](https://github.com/rlpddejong/SurgeNetDINO) | Pretrained DINOv1/v2/v3 surgical foundation backbones |
 | [SurgeNet](https://github.com/TimJaspers0801/SurgeNet) | SurgeNet pretraining dataset |
 
@@ -57,19 +59,21 @@ The benchmark covers three categories of model:
 | SAM2-UNet | `sam2unet` | 256 |
 | SAM3-UNet | `sam3unet` | 336 |
 
-**Temporal models**
+**ATLAS models**
 
 | Model | Key | Input size |
 |---|---|---|
-| EOMT ViT-S/B/L DINOv2 | `eomt_vit{s,b,l}_dinov2` | 518/256 |
-| EOMT ViT-S/B/L DINOv3 | `eomt_vit{s,b,l}_dinov3` | 256 |
-| ATLAS ViT-S/B/L DINOv3 | `atlas_vit{s,b,l}_dinov3` | 256 |
+| ATLAS-ViT-B DINOv1 | `atlas_vitb_dinov1` | 224 |
+| ATLAS-ViT-B DINOv2 | `atlas_vitb_dinov2` | 336 |
+| ATLAS-ViT-S DINOv3 | `atlas_vits_dinov3` | 256 |
+| ATLAS-ViT-B-DINOv3 | `atlas_vitb_dinov3` | 256 |
+| ATLAS-ViT-L-DINOv3 | `atlas_vitl_dinov3` | 256 |
 
 ## Setup
 
 ```bash
-git clone https://github.com/TimJaspers0801/atlas-bench-public
-cd atlas-bench-public
+git clone https://github.com/TimJaspers0801/ATLAS-bench-public
+cd ATLAS-bench-public
 pip install torch torchvision timm transformers wandb tqdm numpy opencv-python pycocotools
 ```
 
@@ -86,6 +90,8 @@ weights/
 The ATLAS-120k dataset (annotations + extracted frames) should be packaged as a zip and placed at the path you pass to `--data_path`. See the [ATLAS-120k repository]() for download and processing instructions.
 
 ## Training
+
+This training script is intended for the SOTA baseline and foundation models in this repository. ATLAS/EOMT training is handled in [ATLAS-model](https://github.com/rlpddejong/ATLAS-model).
 
 ```bash
 python train_atlas120k.py \
@@ -118,6 +124,8 @@ Key arguments:
 Checkpoints and logs are written to `outputs/<experiment_name>/`. [Weights & Biases](https://wandb.ai) is used for experiment tracking.
 
 ## Evaluation
+
+This repository supports evaluation for all listed models, including ATLAS and EOMT checkpoints trained in [ATLAS-model](https://github.com/rlpddejong/ATLAS-model).
 
 ```bash
 python test_atlas120k.py \
