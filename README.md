@@ -4,7 +4,7 @@
 
 **Benchmark for Surgical Anatomy Segmentation on ATLAS-120k**
 
-[![Dataset](https://img.shields.io/badge/🤗_Dataset-HuggingFace-ffcc00?style=flat)](https://huggingface.co/TimJaspersTue/datasets/atlas-120k)
+[![Dataset](https://img.shields.io/badge/🤗_Dataset-HuggingFace-ffcc00?style=flat)](https://huggingface.co/datasets/TimJaspersTue/ATLAS-120k)
 [![License: MIT](https://img.shields.io/badge/License-MIT-lightgrey.svg)](LICENSE)
 
 </div>
